@@ -1,4 +1,5 @@
 #include "group_normalization_plugin.h"
+
 #include "common/dimsHelpers.h"
 #include "common/serialize.hpp"
 
@@ -7,76 +8,109 @@ using nvinfer1::plugin::GroupNormalizationPlugin;
 using nvinfer1::plugin::GroupNormalizationPluginCreator;
 
 namespace {
-constexpr char const *kGROUP_NORM_VERSION{"1"};                     // GroupNormalizationPlugin版本号
-constexpr char const *kGROUP_NORM_NAME{"GroupNormalizationPlugin"}; // GroupNormalizationPlugin名称
+constexpr const char *kGROUP_NORM_VERSION{"1"};                     // GroupNormalizationPlugin版本号
+constexpr const char *kGROUP_NORM_NAME{"GroupNormalizationPlugin"}; // GroupNormalizationPlugin名称
 } // namespace
 
 // // Static class fields initialization
-PluginFieldCollection GroupNormalizationPluginCreator::mFC{};
+PluginFieldCollection              GroupNormalizationPluginCreator::mFC{};
 std::vector<nvinfer1::PluginField> GroupNormalizationPluginCreator::mPluginAttributes;
 
 REGISTER_TENSORRT_PLUGIN(GroupNormalizationPluginCreator);
 
-GroupNormalizationPlugin::GroupNormalizationPlugin(float epsilon, int nbGroups)
-    : mEpsilon(epsilon) // 初始化mEpsilon为epsilon
-      ,
-      mNbGroups(nbGroups) // 初始化mNbGroups为nbGroups
+GroupNormalizationPlugin::GroupNormalizationPlugin(float epsilon, int nbGroups, int nbChannels)
+    : mEpsilon(epsilon)   // 初始化mEpsilon为epsilon
+    , mNbGroups(nbGroups) // 初始化mNbGroups为nbGroups
+    , mNbChannels(nbChannels)
 {
     PLUGIN_VALIDATE(mEpsilon > 0.0F); // 确保mEpsilon大于0
     // Number of groups should be positive
     PLUGIN_VALIDATE(mNbGroups > 0); // 确保mNbGroups大于0
+    PLUGIN_VALIDATE(mNbChannels > 0);
+    // TODO: 获取 gamma 和 beta 数据并 copy 到 device
 }
 
-int GroupNormalizationPlugin::initialize() noexcept {
-    auto allocScaleBias = [this](std::shared_ptr<CudaBind<float>> &buf, float value) {
-        PLUGIN_VALIDATE(mNbScaleBias > 0); // 确保mNbScaleBias大于0
-        if (!buf || !buf->mPtr || buf->mSize != mNbScaleBias) {
-            // Allocate device memory.
-            buf = std::make_shared<CudaBind<float>>(mNbScaleBias); // 分配设备内存
+int GroupNormalizationPlugin::initialize() noexcept
+{
+    auto allocScaleBias = [this](std::shared_ptr<CudaBind<float>> &buf, float value)
+    {
+        // 确保mNbScaleBias大于0
+        PLUGIN_VALIDATE(mNbScaleBias > 0);
+        if (!buf || !buf->mPtr || buf->mSize != mNbScaleBias)
+        {
+            // 分配设备内存
+            buf = std::make_shared<CudaBind<float>>(mNbScaleBias);
 
-            // Initialize values.
-            std::vector<float> const values(mNbScaleBias, value); // 初始化values为长度为mNbScaleBias，值为value的向量
-            PLUGIN_CUASSERT(cudaMemcpy(buf->mPtr, values.data(), sizeof(float) * mNbScaleBias,
-                                       cudaMemcpyHostToDevice)); // 将values拷贝到buf->mPtr中
+            // 初始化values为长度为mNbScaleBias，值为value的向量
+            std::vector<float> const values(mNbScaleBias, value);
+            // 将values拷贝到buf->mPtr中
+            PLUGIN_CUASSERT(cudaMemcpy(buf->mPtr, values.data(), sizeof(float) * mNbScaleBias, cudaMemcpyHostToDevice));
         }
     };
 
-    allocScaleBias(mBnScales, 1.F); // 初始化mBnScales
-    allocScaleBias(mBnBias, 0.F);   // 初始化mBnBias
+    // 分配内存并初始化mBnScales、mBnBias
+    allocScaleBias(mBnScales, 1.F);
+    allocScaleBias(mBnBias, 0.F);
+
+    auto allocGammaBeta = [this](std::shared_ptr<CudaBind<float>> &buf, float value)
+    {
+        PLUGIN_VALIDATE(mNbChannels > 0);
+        if (!buf || !buf->mPtr || buf->mSize != mNbChannels)
+        {
+            // 分配设备内存
+            buf = std::make_shared<CudaBind<float>>(mNbChannels);
+
+            std::vector<float> const values(mNbChannels, value);
+
+            PLUGIN_CUASSERT(cudaMemcpy(buf->mPtr, values.data(), sizeof(float) * mNbChannels, cudaMemcpyHostToDevice));
+        }
+    };
+    // 分配内存并初始化
+    allocGammaBeta(mGnGammas, 1.F);
+    allocGammaBeta(mGnBetas, 0.f);
     return 0;
 }
 
-GroupNormalizationPlugin::GroupNormalizationPlugin(void const *data, size_t length) {
+GroupNormalizationPlugin::GroupNormalizationPlugin(const void *data, size_t length)
+{
     // 反序列化，按照序列化的顺序
-    deserialize_value(&data, &length, &mEpsilon);     // 反序列化mEpsilon
-    deserialize_value(&data, &length, &mNbGroups);    // 反序列化mNbGroups
-    deserialize_value(&data, &length, &mNbScaleBias); // 反序列化mNbScaleBias
+    deserialize_value(&data, &length, &mEpsilon);
+    deserialize_value(&data, &length, &mNbGroups);
+    deserialize_value(&data, &length, &mNbChannels);
+    deserialize_value(&data, &length, &mNbScaleBias);
+    // TODO: 反序列化 gamma 和 beta
 }
 
-char const *GroupNormalizationPlugin::getPluginType() const noexcept {
+const char *GroupNormalizationPlugin::getPluginType() const noexcept
+{
     return kGROUP_NORM_NAME; // 返回GroupNormalizationPlugin名称
 }
 
-char const *GroupNormalizationPlugin::getPluginVersion() const noexcept {
+const char *GroupNormalizationPlugin::getPluginVersion() const noexcept
+{
     return kGROUP_NORM_VERSION; // 返回GroupNormalizationPlugin版本号
 }
 
-int GroupNormalizationPlugin::getNbOutputs() const noexcept {
+int GroupNormalizationPlugin::getNbOutputs() const noexcept
+{
     return 1; // 返回输出数量为1
 }
 
-nvinfer1::DimsExprs GroupNormalizationPlugin::getOutputDimensions(int index, nvinfer1::DimsExprs const *inputs,
-                                                                  int nbInputs,
-                                                                  nvinfer1::IExprBuilder &exprBuilder) noexcept {
+nvinfer1::DimsExprs GroupNormalizationPlugin::getOutputDimensions(int index, const nvinfer1::DimsExprs *inputs,
+                                                                  int                     nbInputs,
+                                                                  nvinfer1::IExprBuilder &exprBuilder) noexcept
+{
     // 插件的三个输入分别为上一层的输入、gamma 和 beta
-    PLUGIN_ASSERT(nbInputs == 3);          // 确保输入数量为3
+    // 实际推理 gamma 和 beta 应该从 weight 读取
+    PLUGIN_ASSERT(nbInputs == 1);          // 确保输入数量为1
     PLUGIN_ASSERT(index == 0);             // 确保输出索引为0
     nvinfer1::DimsExprs output(inputs[0]); // 输出的维度与上一层的输入相同
     return output;                         // 返回输出的维度
 }
 
 void GroupNormalizationPlugin::attachToContext(cudnnContext *cudnnContext, cublasContext *cublasContext,
-                                               IGpuAllocator *gpuAllocator) noexcept {
+                                               IGpuAllocator *gpuAllocator) noexcept
+{
     PLUGIN_ASSERT(cudnnContext);                              // 确保cudnnContext不为空
     _cudnn_handle = cudnnContext;                             // 将cudnnContext赋值给_cudnn_handle
     PLUGIN_CUDNNASSERT(cudnnCreateTensorDescriptor(&desc));   // 创建描述符desc
@@ -84,23 +118,26 @@ void GroupNormalizationPlugin::attachToContext(cudnnContext *cudnnContext, cubla
 }
 
 // 将插件对象从其执行上下文中分离
-void GroupNormalizationPlugin::detachFromContext() noexcept {
+void GroupNormalizationPlugin::detachFromContext() noexcept
+{
     PLUGIN_CUDNNASSERT(cudnnDestroyTensorDescriptor(desc));   // 销毁描述符desc
     PLUGIN_CUDNNASSERT(cudnnDestroyTensorDescriptor(bnDesc)); // 销毁描述符bnDesc
 }
 
-int GroupNormalizationPlugin::enqueue(nvinfer1::PluginTensorDesc const *inputDesc,
-                                      nvinfer1::PluginTensorDesc const *outputDesc, void const *const *inputs,
-                                      void *const *outputs, void *workspace, cudaStream_t stream) noexcept {
+int GroupNormalizationPlugin::enqueue(const nvinfer1::PluginTensorDesc *inputDesc,
+                                      const nvinfer1::PluginTensorDesc *outputDesc, const void *const *inputs,
+                                      void *const *outputs, void *workspace, cudaStream_t stream) noexcept
+{
     // 获取输入维度
     nvinfer1::Dims input_dims = inputDesc[0].dims;
-    int batchSize = input_dims.d[0];
-    int nbChannels = input_dims.d[1];
+    int            batchSize  = input_dims.d[0];
+    int            nbChannels = input_dims.d[1];
+    PLUGIN_VALIDATE(nbChannels == mNbChannels);
 
     // 计算每个组的大小
-    int groupSize = nbChannels / mNbGroups;
+    int groupSize = mNbChannels / mNbGroups;
 
-    // 计算每个通道的体积
+    // 计算每个通道的体积，即 height * width
     mChannelVolume = pluginInternal::volume(input_dims, /*start*/ 2, /*stop*/ inputDesc[0].dims.nbDims);
 
     // 设置 cudnn tensor 描述符
@@ -117,9 +154,9 @@ int GroupNormalizationPlugin::enqueue(nvinfer1::PluginTensorDesc const *inputDes
     PLUGIN_CHECK_CUDNN(cudnnDeriveBNTensorDescriptor(bnDesc, desc, CUDNN_BATCHNORM_SPATIAL));
     PLUGIN_CHECK_CUDNN(cudnnSetStream(_cudnn_handle, stream));
 
-    // 根据 cudnnSetTensor4dDescriptor 重塑数据
     PLUGIN_ASSERT(mBnScales && mBnScales->mPtr);
     PLUGIN_ASSERT(mBnBias && mBnBias->mPtr);
+
     float a = 1.F;
     float b = 0.F;
     PLUGIN_CHECK_CUDNN(cudnnBatchNormalizationForwardTraining(
@@ -143,128 +180,180 @@ int GroupNormalizationPlugin::enqueue(nvinfer1::PluginTensorDesc const *inputDes
         ));
 
     float *output = static_cast<float *>(outputs[0]);
-    return scaleShiftChannelsInplace(output, batchSize, nbChannels, mChannelVolume,
-                                     static_cast<float const *>(inputs[2]), static_cast<float const *>(inputs[1]),
-                                     stream); // mBetaDev, mGammaDev,
+    PLUGIN_ASSERT(mGnBetas && mGnBetas->mPtr);
+    PLUGIN_ASSERT(mGnGammas && mGnGammas->mPtr);
+    return scaleShiftChannelsInplace(output, batchSize, mNbChannels, mChannelVolume, (float *)mGnBetas->mPtr,
+                                     (float *)mGnGammas->mPtr, stream);
 }
 
-size_t GroupNormalizationPlugin::getSerializationSize() const noexcept {
+size_t GroupNormalizationPlugin::getSerializationSize() const noexcept
+{
     return sizeof(mNbGroups) + sizeof(mEpsilon) + sizeof(mNbScaleBias);
 }
 
-void GroupNormalizationPlugin::serialize(void *buffer) const noexcept {
+void GroupNormalizationPlugin::serialize(void *buffer) const noexcept
+{
     serialize_value(&buffer, mEpsilon);
     serialize_value(&buffer, mNbGroups);
+    serialize_value(&buffer, mNbChannels);
     serialize_value(&buffer, mNbScaleBias);
+    // TODO: 序列化 gamma 和 beta 数据
 }
 
-bool GroupNormalizationPlugin::supportsFormatCombination(int pos, nvinfer1::PluginTensorDesc const *inOut, int nbInputs,
-                                                         int nbOutputs) noexcept {
+bool GroupNormalizationPlugin::supportsFormatCombination(int pos, const nvinfer1::PluginTensorDesc *inOut, int nbInputs,
+                                                         int nbOutputs) noexcept
+{
     PLUGIN_ASSERT(inOut && pos < (nbInputs + nbOutputs));
-    return ((inOut[pos].type == nvinfer1::DataType::kFLOAT) && inOut[pos].format == nvinfer1::PluginFormat::kLINEAR &&
-            inOut[pos].type == inOut[0].type);
+    return ((inOut[pos].type == nvinfer1::DataType::kFLOAT) && inOut[pos].format == nvinfer1::PluginFormat::kLINEAR
+            && inOut[pos].type == inOut[0].type);
 }
 
 void GroupNormalizationPlugin::terminate() noexcept {}
 
-void GroupNormalizationPlugin::destroy() noexcept {
+void GroupNormalizationPlugin::destroy() noexcept
+{
     // This gets called when the network containing plugin is destroyed
     delete this;
 }
 
-IPluginV2DynamicExt *GroupNormalizationPlugin::clone() const noexcept {
-    try {
-        auto *plugin = new GroupNormalizationPlugin(mEpsilon, mNbGroups);
+IPluginV2DynamicExt *GroupNormalizationPlugin::clone() const noexcept
+{
+    try
+    {
+        auto *plugin = new GroupNormalizationPlugin(mEpsilon, mNbGroups, mNbChannels);
         plugin->setPluginNamespace(mPluginNamespace);
         plugin->mNbScaleBias = mNbScaleBias;
-        plugin->mBnScales = mBnScales;
-        plugin->mBnBias = mBnBias;
+        plugin->mBnScales    = mBnScales;
+        plugin->mBnBias      = mBnBias;
+        plugin->mNbChannels  = mNbChannels;
+        plugin->mGnBetas     = mGnBetas;
+        plugin->mGnGammas    = mGnGammas;
         return plugin;
-    } catch (std::exception const &e) {
+    }
+    catch (const std::exception &e)
+    {
         caughtError(e);
     }
     return nullptr;
 }
 
-void GroupNormalizationPlugin::configurePlugin(nvinfer1::DynamicPluginTensorDesc const *in, int nbInputs,
-                                               nvinfer1::DynamicPluginTensorDesc const *out, int nbOutputs) noexcept {
-    int32_t const batchSize = in[0].desc.dims.d[0] <= 0 ? in[0].max.d[0] : in[0].desc.dims.d[0];
-    mNbScaleBias = batchSize * mNbGroups;
+void GroupNormalizationPlugin::configurePlugin(const nvinfer1::DynamicPluginTensorDesc *in, int nbInputs,
+                                               const nvinfer1::DynamicPluginTensorDesc *out, int nbOutputs) noexcept
+{
+    const int32_t batchSize = in[0].desc.dims.d[0] <= 0 ? in[0].max.d[0] : in[0].desc.dims.d[0];
+    mNbScaleBias            = batchSize * mNbGroups;
 }
 
-nvinfer1::DataType GroupNormalizationPlugin::getOutputDataType(int index, nvinfer1::DataType const *inputTypes,
-                                                               int nbInputs) const noexcept {
+nvinfer1::DataType GroupNormalizationPlugin::getOutputDataType(int index, const nvinfer1::DataType *inputTypes,
+                                                               int nbInputs) const noexcept
+{
     PLUGIN_ASSERT(inputTypes && nbInputs > 0 && index == 0);
     return inputTypes[0];
 }
 
-size_t GroupNormalizationPlugin::getWorkspaceSize(nvinfer1::PluginTensorDesc const *inputs, int nbInputs,
-                                                  nvinfer1::PluginTensorDesc const *outputs,
-                                                  int nbOutputs) const noexcept {
+size_t GroupNormalizationPlugin::getWorkspaceSize(const nvinfer1::PluginTensorDesc *inputs, int nbInputs,
+                                                  const nvinfer1::PluginTensorDesc *outputs,
+                                                  int                               nbOutputs) const noexcept
+{
     return 0;
 }
 
-void GroupNormalizationPlugin::setPluginNamespace(char const *libNamespace) noexcept {
+void GroupNormalizationPlugin::setPluginNamespace(const char *libNamespace) noexcept
+{
     mPluginNamespace = libNamespace;
 }
 
-char const *GroupNormalizationPlugin::getPluginNamespace() const noexcept { return mPluginNamespace; }
+const char *GroupNormalizationPlugin::getPluginNamespace() const noexcept
+{
+    return mPluginNamespace;
+}
 
-GroupNormalizationPluginCreator::GroupNormalizationPluginCreator() {
+GroupNormalizationPluginCreator::GroupNormalizationPluginCreator()
+{
     mPluginAttributes.clear();
     mPluginAttributes.emplace_back(PluginField("eps", nullptr, PluginFieldType::kFLOAT32, 1));
     mPluginAttributes.emplace_back(PluginField("num_groups", nullptr, PluginFieldType::kINT32, 1));
+    mPluginAttributes.emplace_back(PluginField("num_channels", nullptr, PluginFieldType::kINT32, 1));
 
     mFC.nbFields = mPluginAttributes.size();
-    mFC.fields = mPluginAttributes.data();
+    mFC.fields   = mPluginAttributes.data();
 }
 
-char const *GroupNormalizationPluginCreator::getPluginName() const noexcept { return kGROUP_NORM_NAME; }
+const char *GroupNormalizationPluginCreator::getPluginName() const noexcept
+{
+    return kGROUP_NORM_NAME;
+}
 
-char const *GroupNormalizationPluginCreator::getPluginVersion() const noexcept { return kGROUP_NORM_VERSION; }
+const char *GroupNormalizationPluginCreator::getPluginVersion() const noexcept
+{
+    return kGROUP_NORM_VERSION;
+}
 
-PluginFieldCollection const *GroupNormalizationPluginCreator::getFieldNames() noexcept { return &mFC; }
+const PluginFieldCollection *GroupNormalizationPluginCreator::getFieldNames() noexcept
+{
+    return &mFC;
+}
 
-char const *GroupNormalizationPluginCreator::getPluginNamespace() const noexcept { return mNamespace.c_str(); }
+const char *GroupNormalizationPluginCreator::getPluginNamespace() const noexcept
+{
+    return mNamespace.c_str();
+}
 
-void GroupNormalizationPluginCreator::setPluginNamespace(char const *libNamespace) noexcept {
+void GroupNormalizationPluginCreator::setPluginNamespace(const char *libNamespace) noexcept
+{
     mNamespace = libNamespace;
 }
 
-IPluginV2DynamicExt *GroupNormalizationPluginCreator::createPlugin(char const *name,
-                                                                   PluginFieldCollection const *fc) noexcept {
-    try {
+IPluginV2DynamicExt *GroupNormalizationPluginCreator::createPlugin(const char                  *name,
+                                                                   const PluginFieldCollection *fc) noexcept
+{
+    try
+    {
         // Set default values
-        int nbGroups{1};
+        int   nbGroups{1};
         float epsilon{0.00001F};
-        for (int i = 0; i < fc->nbFields; i++) {
+        int   nbChannels{1};
+        for (int i = 0; i < fc->nbFields; i++)
+        {
             std::string field_name(fc->fields[i].name);
-            if (field_name.compare("eps") == 0) {
-                epsilon = *static_cast<float const *>(fc->fields[i].data);
+            if (field_name.compare("eps") == 0)
+            {
+                epsilon = *static_cast<const float *>(fc->fields[i].data);
             }
-            if (field_name.compare("num_groups") == 0) {
-                nbGroups = *static_cast<int const *>(fc->fields[i].data);
+            if (field_name.compare("num_groups") == 0)
+            {
+                nbGroups = *static_cast<const int *>(fc->fields[i].data);
+            }
+            if (field_name.compare("num_channels") == 0)
+            {
+                nbChannels = *static_cast<const int *>(fc->fields[i].data);
             }
         }
 
-        GroupNormalizationPlugin *plugin = new GroupNormalizationPlugin(epsilon, nbGroups);
+        GroupNormalizationPlugin *plugin = new GroupNormalizationPlugin(epsilon, nbGroups, nbChannels);
         plugin->setPluginNamespace(mNamespace.c_str());
 
         return plugin;
-    } catch (std::exception const &e) {
+    }
+    catch (const std::exception &e)
+    {
         caughtError(e);
     }
     return nullptr;
 }
 
-IPluginV2DynamicExt *GroupNormalizationPluginCreator::deserializePlugin(char const *name, void const *serialData,
-                                                                        size_t serialLength) noexcept {
-    try {
+IPluginV2DynamicExt *GroupNormalizationPluginCreator::deserializePlugin(const char *name, const void *serialData,
+                                                                        size_t serialLength) noexcept
+{
+    try
+    {
         GroupNormalizationPlugin *plugin = new GroupNormalizationPlugin(serialData, serialLength);
         plugin->setPluginNamespace(mNamespace.c_str());
 
         return plugin;
-    } catch (std::exception const &e) {
+    }
+    catch (const std::exception &e)
+    {
         caughtError(e);
     }
     return nullptr;
@@ -272,39 +361,40 @@ IPluginV2DynamicExt *GroupNormalizationPluginCreator::deserializePlugin(char con
 
 // 调用GroupNormalizationPluginCreator返回一个IPluginV2Layer*
 IPluginV2Layer *nvinfer1::plugin::addGroupNormLayer(nvinfer1::INetworkDefinition *network, nvinfer1::ITensor &input,
-                                                    int num_groups, float epsilon) {
-
+                                                    int num_groups, int num_channels, float epsilon)
+{
     // 创建GroupNormalizationPlugin
-    std::cout << "Create plugin creator" << std::endl;
     auto plugin_creator = getPluginRegistry()->getPluginCreator(kGROUP_NORM_NAME, kGROUP_NORM_VERSION);
-    std::cout << "plugin_creator ptr: " << (void *)plugin_creator << std::endl;
-    std::cout << "Create PluginField" << std::endl;
-    PluginField plugin_fields[2];
-    plugin_fields[0].name = "eps";
-    plugin_fields[0].data = &epsilon;
-    plugin_fields[0].type = PluginFieldType::kFLOAT32;
+    PLUGIN_ASSERT(plugin_creator);
+
+    PluginField plugin_fields[3];
+    plugin_fields[0].name   = "eps";
+    plugin_fields[0].data   = &epsilon;
+    plugin_fields[0].type   = PluginFieldType::kFLOAT32;
     plugin_fields[0].length = 1;
 
-    plugin_fields[1].name = "num_groups";
-    plugin_fields[1].data = &num_groups;
-    plugin_fields[1].type = PluginFieldType::kINT32;
+    plugin_fields[1].name   = "num_groups";
+    plugin_fields[1].data   = &num_groups;
+    plugin_fields[1].type   = PluginFieldType::kINT32;
     plugin_fields[1].length = 1;
 
-    std::cout << "Create PluginFieldCollection" << std::endl;
+    plugin_fields[2].name   = "num_channels";
+    plugin_fields[2].data   = &num_channels;
+    plugin_fields[2].type   = PluginFieldType::kINT32;
+    plugin_fields[2].length = 1;
+
+    // TODO: 从 weight 读取 gamma 和 beta 并传给 plugin
+
     PluginFieldCollection plugin_data;
-    plugin_data.nbFields = 2;
-    plugin_data.fields = plugin_fields;
-    std::cout << "Create plugin" << std::endl;
+    plugin_data.nbFields  = 3;
+    plugin_data.fields    = plugin_fields;
     IPluginV2 *plugin_obj = plugin_creator->createPlugin(kGROUP_NORM_NAME, &plugin_data);
-    std::cout << "plugin_obj ptr: " << (void *)plugin_obj << std::endl;
-    if (plugin_creator == nullptr) {
-        return nullptr;
-    }
-    std::cout << "addPluginV2" << std::endl;
-    // plugin_creator
+
+    PLUGIN_ASSERT(plugin_obj);
     nvinfer1::ITensor *input_tensors[] = {&input};
+    // 这里要求三个输入 input、gamma、beta
+    // gamma、beta 的大小等于 input 的通道数
+    input.getDimensions();
     auto *plugin_layer = network->addPluginV2(input_tensors, 1, *plugin_obj);
-    std::cout << "addPluginV2 done" << std::endl;
-    std::cout << "plugin_layer ptr: " << (void *)plugin_layer << std::endl;
     return plugin_layer;
 }

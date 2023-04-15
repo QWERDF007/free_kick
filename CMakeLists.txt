@@ -8,7 +8,7 @@ project(free_kick
 
 enable_language(CUDA)
 
-
+set(CMAKE_CXX_STANDARD 17)
 
 # Options to configure the build tree =======
 option(BUILD_SAMPLES "Enable samples" OFF)

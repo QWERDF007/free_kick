@@ -16,20 +16,20 @@
  */
 
 #include "common/checkMacrosPlugin.h"
+
 #include "common/vfcCommon.h"
-#include <cstdlib>
+
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 
-namespace nvinfer1
-{
-namespace plugin
-{
+#include <cstdlib>
+
+namespace nvinfer1 { namespace plugin {
 
 // This will be populated by the logger supplied by the user to initLibNvInferPlugins()
-ILogger* gLogger{};
+ILogger *gLogger{};
 
-template <ILogger::Severity kSeverity>
+template<ILogger::Severity kSeverity>
 int LogStream<kSeverity>::Buf::sync()
 {
     std::string s = str();
@@ -47,13 +47,13 @@ int LogStream<kSeverity>::Buf::sync()
 
 // These use gLogger, and therefore require initLibNvInferPlugins() to be called with a logger
 // (otherwise, it will not log)
-LogStream<ILogger::Severity::kERROR> gLogError;
+LogStream<ILogger::Severity::kERROR>   gLogError;
 LogStream<ILogger::Severity::kWARNING> gLogWarning;
-LogStream<ILogger::Severity::kINFO> gLogInfo;
+LogStream<ILogger::Severity::kINFO>    gLogInfo;
 LogStream<ILogger::Severity::kVERBOSE> gLogVerbose;
 
 // break-pointable
-void throwCudaError(char const* file, char const* function, int line, int status, char const* msg)
+void throwCudaError(const char *file, const char *function, int line, int status, const char *msg)
 {
     CudaError error(file, function, line, status, msg);
     error.log(gLogError);
@@ -62,23 +62,43 @@ void throwCudaError(char const* file, char const* function, int line, int status
 }
 
 // break-pointable
-void throwCublasError(char const* file, char const* function, int line, int status, char const* msg)
+void throwCublasError(const char *file, const char *function, int line, int status, const char *msg)
 {
     if (msg == nullptr)
     {
         auto s_ = static_cast<cublasStatus_t>(status);
         switch (s_)
         {
-        case CUBLAS_STATUS_SUCCESS: msg = "CUBLAS_STATUS_SUCCESS"; break;
-        case CUBLAS_STATUS_NOT_INITIALIZED: msg = "CUBLAS_STATUS_NOT_INITIALIZED"; break;
-        case CUBLAS_STATUS_ALLOC_FAILED: msg = "CUBLAS_STATUS_ALLOC_FAILED"; break;
-        case CUBLAS_STATUS_INVALID_VALUE: msg = "CUBLAS_STATUS_INVALID_VALUE"; break;
-        case CUBLAS_STATUS_ARCH_MISMATCH: msg = "CUBLAS_STATUS_ARCH_MISMATCH"; break;
-        case CUBLAS_STATUS_MAPPING_ERROR: msg = "CUBLAS_STATUS_MAPPING_ERROR"; break;
-        case CUBLAS_STATUS_EXECUTION_FAILED: msg = "CUBLAS_STATUS_EXECUTION_FAILED"; break;
-        case CUBLAS_STATUS_INTERNAL_ERROR: msg = "CUBLAS_STATUS_INTERNAL_ERROR"; break;
-        case CUBLAS_STATUS_NOT_SUPPORTED: msg = "CUBLAS_STATUS_NOT_SUPPORTED"; break;
-        case CUBLAS_STATUS_LICENSE_ERROR: msg = "CUBLAS_STATUS_LICENSE_ERROR"; break;
+        case CUBLAS_STATUS_SUCCESS:
+            msg = "CUBLAS_STATUS_SUCCESS";
+            break;
+        case CUBLAS_STATUS_NOT_INITIALIZED:
+            msg = "CUBLAS_STATUS_NOT_INITIALIZED";
+            break;
+        case CUBLAS_STATUS_ALLOC_FAILED:
+            msg = "CUBLAS_STATUS_ALLOC_FAILED";
+            break;
+        case CUBLAS_STATUS_INVALID_VALUE:
+            msg = "CUBLAS_STATUS_INVALID_VALUE";
+            break;
+        case CUBLAS_STATUS_ARCH_MISMATCH:
+            msg = "CUBLAS_STATUS_ARCH_MISMATCH";
+            break;
+        case CUBLAS_STATUS_MAPPING_ERROR:
+            msg = "CUBLAS_STATUS_MAPPING_ERROR";
+            break;
+        case CUBLAS_STATUS_EXECUTION_FAILED:
+            msg = "CUBLAS_STATUS_EXECUTION_FAILED";
+            break;
+        case CUBLAS_STATUS_INTERNAL_ERROR:
+            msg = "CUBLAS_STATUS_INTERNAL_ERROR";
+            break;
+        case CUBLAS_STATUS_NOT_SUPPORTED:
+            msg = "CUBLAS_STATUS_NOT_SUPPORTED";
+            break;
+        case CUBLAS_STATUS_LICENSE_ERROR:
+            msg = "CUBLAS_STATUS_LICENSE_ERROR";
+            break;
         }
     }
     CublasError error(file, function, line, status, msg);
@@ -88,7 +108,7 @@ void throwCublasError(char const* file, char const* function, int line, int stat
 }
 
 // break-pointable
-void throwCudnnError(char const* file, char const* function, int line, int status, char const* msg)
+void throwCudnnError(const char *file, const char *function, int line, int status, const char *msg)
 {
     CudnnError error(file, function, line, status, msg);
     error.log(gLogError);
@@ -97,7 +117,7 @@ void throwCudnnError(char const* file, char const* function, int line, int statu
 }
 
 // break-pointable
-void throwPluginError(char const* file, char const* function, int line, int status, char const* msg)
+void throwPluginError(const char *file, const char *function, int line, int status, const char *msg)
 {
     PluginError error(file, function, line, status, msg);
     reportValidationFailure(msg, file, line);
@@ -105,18 +125,18 @@ void throwPluginError(char const* file, char const* function, int line, int stat
     throw error;
 }
 
-void logError(char const* msg, char const* file, char const* fn, int line)
+void logError(const char *msg, const char *file, const char *fn, int line)
 {
     gLogError << "Parameter check failed at: " << file << "::" << fn << "::" << line;
     gLogError << ", condition: " << msg << std::endl;
 }
 
-void reportValidationFailure(char const* msg, char const* file, int line)
+void reportValidationFailure(const char *msg, const char *file, int line)
 {
     std::ostringstream stream;
     stream << "Validation failed: " << msg << "\n" << file << ':' << line << "\n";
 #ifdef COMPILE_VFC_PLUGIN
-    ILogger* logger = getPluginLogger();
+    ILogger *logger = getPluginLogger();
     if (logger != nullptr)
     {
         logger->log(nvinfer1::ILogger::Severity::kINTERNAL_ERROR, stream.str().c_str());
@@ -127,7 +147,7 @@ void reportValidationFailure(char const* msg, char const* file, int line)
 }
 
 // break-pointable
-void reportAssertion(char const* msg, char const* file, int line)
+void reportAssertion(const char *msg, const char *file, int line)
 {
     std::ostringstream stream;
     stream << "Assertion failed: " << msg << "\n"
@@ -135,7 +155,7 @@ void reportAssertion(char const* msg, char const* file, int line)
            << "Aborting..."
            << "\n";
 #ifdef COMPILE_VFC_PLUGIN
-    ILogger* logger = getPluginLogger();
+    ILogger *logger = getPluginLogger();
     if (logger != nullptr)
     {
         logger->log(nvinfer1::ILogger::Severity::kINTERNAL_ERROR, stream.str().c_str());
@@ -147,7 +167,7 @@ void reportAssertion(char const* msg, char const* file, int line)
     abort();
 }
 
-void TRTException::log(std::ostream& logStream) const
+void TRTException::log(std::ostream &logStream) const
 {
     logStream << file << " (" << line << ") - " << name << " Error in " << function << ": " << status;
     if (message != nullptr)
@@ -157,6 +177,4 @@ void TRTException::log(std::ostream& logStream) const
     logStream << std::endl;
 }
 
-} // namespace plugin
-
-} // namespace nvinfer1
+}} // namespace nvinfer1::plugin

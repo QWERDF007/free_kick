@@ -1,13 +1,13 @@
 #pragma once
 #include "common/plugin.h"
+
 #include <cudnn.h>
+
 #include <memory>
 #include <string>
 #include <vector>
 
-namespace nvinfer1 {
-
-namespace plugin {
+namespace nvinfer1 { namespace plugin {
 
 /**
  * @brief 对输入的张量进行归一化
@@ -22,19 +22,20 @@ namespace plugin {
  * @param stream cuda流
  * @return cudaError_t
  */
-template <typename T>
-cudaError_t scaleShiftChannelsInplace(T *inOut, int const B, int const C, int const channelVolume, float const *beta,
-                                      float const *gamma, cudaStream_t stream);
+template<typename T>
+cudaError_t scaleShiftChannelsInplace(T *inOut, const int B, const int C, const int channelVolume, float *beta,
+                                      float *gamma, cudaStream_t stream);
 
-class TRT_PLUGIN_API GroupNormalizationPlugin final : public nvinfer1::IPluginV2DynamicExt {
-  public:
+class TRT_PLUGIN_API GroupNormalizationPlugin final : public nvinfer1::IPluginV2DynamicExt
+{
+public:
     /**
      * @brief 构造函数
      *
      * @param epsilon
      * @param nbGroups
      */
-    GroupNormalizationPlugin(float epsilon, int const nbGroups);
+    GroupNormalizationPlugin(float epsilon, int nbGroups, int nbChannels);
 
     /**
      * @brief 从序列化数据构造插件
@@ -42,7 +43,7 @@ class TRT_PLUGIN_API GroupNormalizationPlugin final : public nvinfer1::IPluginV2
      * @param data
      * @param length
      */
-    GroupNormalizationPlugin(void const *data, size_t length);
+    GroupNormalizationPlugin(const void *data, size_t length);
 
     // It doesn't make sense to make GroupNormalizationPlugin without arguments,
     // so we delete default constructor.
@@ -64,7 +65,7 @@ class TRT_PLUGIN_API GroupNormalizationPlugin final : public nvinfer1::IPluginV2
      * @param exprBuilder
      * @return DimsExprs
      */
-    DimsExprs getOutputDimensions(int index, nvinfer1::DimsExprs const *inputs, int nbInputDims,
+    DimsExprs getOutputDimensions(int index, const nvinfer1::DimsExprs *inputs, int nbInputDims,
                                   nvinfer1::IExprBuilder &exprBuilder) noexcept override;
 
     /**
@@ -89,8 +90,8 @@ class TRT_PLUGIN_API GroupNormalizationPlugin final : public nvinfer1::IPluginV2
      * @param nbOutputs
      * @return size_t
      */
-    size_t getWorkspaceSize(nvinfer1::PluginTensorDesc const *inputs, int nbInputs,
-                            nvinfer1::PluginTensorDesc const *outputs, int nbOutputs) const noexcept override;
+    size_t getWorkspaceSize(const nvinfer1::PluginTensorDesc *inputs, int nbInputs,
+                            const nvinfer1::PluginTensorDesc *outputs, int nbOutputs) const noexcept override;
 
     /**
      * @brief 执行插件
@@ -103,8 +104,8 @@ class TRT_PLUGIN_API GroupNormalizationPlugin final : public nvinfer1::IPluginV2
      * @param stream
      * @return int
      */
-    int enqueue(nvinfer1::PluginTensorDesc const *inputDesc, nvinfer1::PluginTensorDesc const *outputDesc,
-                void const *const *inputs, void *const *outputs, void *workspace,
+    int enqueue(const nvinfer1::PluginTensorDesc *inputDesc, const nvinfer1::PluginTensorDesc *outputDesc,
+                const void *const *inputs, void *const *outputs, void *workspace,
                 cudaStream_t stream) noexcept override;
 
     /**
@@ -130,7 +131,7 @@ class TRT_PLUGIN_API GroupNormalizationPlugin final : public nvinfer1::IPluginV2
      * @param nbOutputs
      * @return bool
      */
-    bool supportsFormatCombination(int pos, nvinfer1::PluginTensorDesc const *inOut, int nbInputs,
+    bool supportsFormatCombination(int pos, const nvinfer1::PluginTensorDesc *inOut, int nbInputs,
                                    int nbOutputs) noexcept override;
 
     /**
@@ -138,14 +139,14 @@ class TRT_PLUGIN_API GroupNormalizationPlugin final : public nvinfer1::IPluginV2
      *
      * @return char const*
      */
-    char const *getPluginType() const noexcept override;
+    const char *getPluginType() const noexcept override;
 
     /**
      * @brief 获取插件版本
      *
      * @return char const*
      */
-    char const *getPluginVersion() const noexcept override;
+    const char *getPluginVersion() const noexcept override;
 
     /**
      * @brief 克隆插件
@@ -168,7 +169,7 @@ class TRT_PLUGIN_API GroupNormalizationPlugin final : public nvinfer1::IPluginV2
      * @param nbInputs
      * @return DataType
      */
-    DataType getOutputDataType(int index, nvinfer1::DataType const *inputTypes, int nbInputs) const noexcept override;
+    DataType getOutputDataType(int index, const nvinfer1::DataType *inputTypes, int nbInputs) const noexcept override;
 
     /**
      * @brief 绑定上下文
@@ -191,14 +192,14 @@ class TRT_PLUGIN_API GroupNormalizationPlugin final : public nvinfer1::IPluginV2
      *
      * @param pluginNamespace
      */
-    void setPluginNamespace(char const *pluginNamespace) noexcept override;
+    void setPluginNamespace(const char *pluginNamespace) noexcept override;
 
     /**
      * @brief 获取插件命名空间
      *
      * @return char const*
      */
-    char const *getPluginNamespace() const noexcept override;
+    const char *getPluginNamespace() const noexcept override;
 
     /**
      * @brief 配置插件
@@ -208,25 +209,28 @@ class TRT_PLUGIN_API GroupNormalizationPlugin final : public nvinfer1::IPluginV2
      * @param out
      * @param nbOutputs
      */
-    void configurePlugin(nvinfer1::DynamicPluginTensorDesc const *in, int nbInputs,
-                         nvinfer1::DynamicPluginTensorDesc const *out, int nbOutputs) noexcept override;
+    void configurePlugin(const nvinfer1::DynamicPluginTensorDesc *in, int nbInputs,
+                         const nvinfer1::DynamicPluginTensorDesc *out, int nbOutputs) noexcept override;
 
-  private:
-    char const *mPluginNamespace;
+private:
+    const char *mPluginNamespace;
     std::string mNamespace;
 
     float mEpsilon;
-    int mNbGroups;
-    int mChannelVolume;
+    int   mNbGroups;
+    int   mChannelVolume;
 
-    cudnnHandle_t _cudnn_handle;
+    cudnnHandle_t                    _cudnn_handle;
     // 描述输入和输出
-    cudnnTensorDescriptor_t desc;
-    cudnnTensorDescriptor_t bnDesc;
+    cudnnTensorDescriptor_t          desc;
+    cudnnTensorDescriptor_t          bnDesc;
     // 这些缓冲区初始化为1和0
     std::shared_ptr<CudaBind<float>> mBnScales{};
     std::shared_ptr<CudaBind<float>> mBnBias{};
-    size_t mNbScaleBias{};
+    std::shared_ptr<CudaBind<float>> mGnGammas{};
+    std::shared_ptr<CudaBind<float>> mGnBetas{};
+    size_t                           mNbScaleBias{};
+    size_t                           mNbChannels{};
 
     using IPluginV2::enqueue;
     using IPluginV2::getOutputDimensions;
@@ -234,8 +238,9 @@ class TRT_PLUGIN_API GroupNormalizationPlugin final : public nvinfer1::IPluginV2
     using IPluginV2Ext::configurePlugin;
 };
 
-class GroupNormalizationPluginCreator : public IPluginCreator {
-  public:
+class GroupNormalizationPluginCreator : public IPluginCreator
+{
+public:
     /**
      * @brief 构造函数
      *
@@ -253,21 +258,21 @@ class GroupNormalizationPluginCreator : public IPluginCreator {
      *
      * @return char const*
      */
-    char const *getPluginName() const noexcept override;
+    const char *getPluginName() const noexcept override;
 
     /**
      * @brief 获取插件版本
      *
      * @return char const*
      */
-    char const *getPluginVersion() const noexcept override;
+    const char *getPluginVersion() const noexcept override;
 
     /**
      * @brief 获取插件属性
      *
      * @return PluginFieldCollection const*
      */
-    PluginFieldCollection const *getFieldNames() noexcept override;
+    const PluginFieldCollection *getFieldNames() noexcept override;
 
     /**
      * @brief 创建插件
@@ -276,7 +281,7 @@ class GroupNormalizationPluginCreator : public IPluginCreator {
      * @param fc
      * @return IPluginV2DynamicExt*
      */
-    IPluginV2DynamicExt *createPlugin(char const *name, PluginFieldCollection const *fc) noexcept override;
+    IPluginV2DynamicExt *createPlugin(const char *name, const PluginFieldCollection *fc) noexcept override;
 
     /**
      * @brief 反序列化插件
@@ -286,7 +291,7 @@ class GroupNormalizationPluginCreator : public IPluginCreator {
      * @param serialLength
      * @return IPluginV2DynamicExt*
      */
-    IPluginV2DynamicExt *deserializePlugin(char const *name, void const *serialData,
+    IPluginV2DynamicExt *deserializePlugin(const char *name, const void *serialData,
                                            size_t serialLength) noexcept override;
 
     /**
@@ -294,25 +299,24 @@ class GroupNormalizationPluginCreator : public IPluginCreator {
      *
      * @param pluginNamespace
      */
-    void setPluginNamespace(char const *pluginNamespace) noexcept override;
+    void setPluginNamespace(const char *pluginNamespace) noexcept override;
 
     /**
      * @brief 获取插件命名空间
      *
      * @return char const*
      */
-    char const *getPluginNamespace() const noexcept override;
+    const char *getPluginNamespace() const noexcept override;
 
-  private:
+private:
     // PluginFieldCollection是一个类，它是用于存储插件字段的集合。它是Sitecore的一个类，用于存储插件字段的集合。12
-    static PluginFieldCollection mFC;
+    static PluginFieldCollection    mFC;
     static std::vector<PluginField> mPluginAttributes;
-    std::string mNamespace;
+    std::string                     mNamespace;
 };
 
 // 调用GroupNormalizationPluginCreator返回一个IPluginV2Layer*
 TRT_PLUGIN_API IPluginV2Layer *addGroupNormLayer(nvinfer1::INetworkDefinition *network, nvinfer1::ITensor &input,
-                                                 int num_groups, float epsilon);
+                                                 int num_groups, int num_channels, float epsilon = 1e-5);
 
-} // namespace plugin
-} // namespace nvinfer1
+}} // namespace nvinfer1::plugin

@@ -18,6 +18,7 @@
 #define TENSORRT_LOGGING_H
 
 #include "NvInferRuntimeCommon.h"
+
 #include <cassert>
 #include <ctime>
 #include <iomanip>
@@ -28,19 +29,29 @@
 
 using Severity = nvinfer1::ILogger::Severity;
 
-class LogStreamConsumerBuffer : public std::stringbuf {
-  public:
+class LogStreamConsumerBuffer : public std::stringbuf
+{
+public:
     LogStreamConsumerBuffer(std::ostream &stream, const std::string &prefix, bool shouldLog)
-        : mOutput(stream), mPrefix(prefix), mShouldLog(shouldLog) {}
+        : mOutput(stream)
+        , mPrefix(prefix)
+        , mShouldLog(shouldLog)
+    {
+    }
 
-    LogStreamConsumerBuffer(LogStreamConsumerBuffer &&other) : mOutput(other.mOutput) {}
+    LogStreamConsumerBuffer(LogStreamConsumerBuffer &&other)
+        : mOutput(other.mOutput)
+    {
+    }
 
-    ~LogStreamConsumerBuffer() {
+    ~LogStreamConsumerBuffer()
+    {
         // std::streambuf::pbase() gives a pointer to the beginning of the buffered part of the output sequence
         // std::streambuf::pptr() gives a pointer to the current position of the output sequence
         // if the pointer to the beginning is not equal to the pointer to the current position,
         // call putOutput() to log the output to the stream
-        if (pbase() != pptr()) {
+        if (pbase() != pptr())
+        {
             putOutput();
         }
     }
@@ -48,16 +59,19 @@ class LogStreamConsumerBuffer : public std::stringbuf {
     // synchronizes the stream buffer and returns 0 on success
     // synchronizing the stream buffer consists of inserting the buffer contents into the stream,
     // resetting the buffer and flushing the stream
-    virtual int sync() {
+    virtual int sync()
+    {
         putOutput();
         return 0;
     }
 
-    void putOutput() {
-        if (mShouldLog) {
+    void putOutput()
+    {
+        if (mShouldLog)
+        {
             // prepend timestamp
             std::time_t timestamp = std::time(nullptr);
-            tm *tm_local = std::localtime(&timestamp);
+            tm         *tm_local  = std::localtime(&timestamp);
             std::cout << "[";
             std::cout << std::setw(2) << std::setfill('0') << 1 + tm_local->tm_mon << "/";
             std::cout << std::setw(2) << std::setfill('0') << tm_local->tm_mday << "/";
@@ -75,24 +89,30 @@ class LogStreamConsumerBuffer : public std::stringbuf {
         }
     }
 
-    void setShouldLog(bool shouldLog) { mShouldLog = shouldLog; }
+    void setShouldLog(bool shouldLog)
+    {
+        mShouldLog = shouldLog;
+    }
 
-  private:
+private:
     std::ostream &mOutput;
-    std::string mPrefix;
-    bool mShouldLog;
+    std::string   mPrefix;
+    bool          mShouldLog;
 };
 
 //!
 //! \class LogStreamConsumerBase
 //! \brief Convenience object used to initialize LogStreamConsumerBuffer before std::ostream in LogStreamConsumer
 //!
-class LogStreamConsumerBase {
-  public:
+class LogStreamConsumerBase
+{
+public:
     LogStreamConsumerBase(std::ostream &stream, const std::string &prefix, bool shouldLog)
-        : mBuffer(stream, prefix, shouldLog) {}
+        : mBuffer(stream, prefix, shouldLog)
+    {
+    }
 
-  protected:
+protected:
     LogStreamConsumerBuffer mBuffer;
 };
 
@@ -105,34 +125,45 @@ class LogStreamConsumerBase {
 //!  This is necessary to prevent the address of an uninitialized buffer from being passed to std::ostream.
 //!  Please do not change the order of the parent classes.
 //!
-class LogStreamConsumer : protected LogStreamConsumerBase, public std::ostream {
-  public:
+class LogStreamConsumer
+    : protected LogStreamConsumerBase
+    , public std::ostream
+{
+public:
     //! \brief Creates a LogStreamConsumer which logs messages with level severity.
     //!  Reportable severity determines if the messages are severe enough to be logged.
     LogStreamConsumer(Severity reportableSeverity, Severity severity)
-        : LogStreamConsumerBase(severityOstream(severity), severityPrefix(severity), severity <= reportableSeverity),
-          std::ostream(&mBuffer) // links the stream buffer with the stream
-          ,
-          mShouldLog(severity <= reportableSeverity), mSeverity(severity) {}
+        : LogStreamConsumerBase(severityOstream(severity), severityPrefix(severity), severity <= reportableSeverity)
+        , std::ostream(&mBuffer) // links the stream buffer with the stream
+        , mShouldLog(severity <= reportableSeverity)
+        , mSeverity(severity)
+    {
+    }
 
     LogStreamConsumer(LogStreamConsumer &&other)
-        : LogStreamConsumerBase(severityOstream(other.mSeverity), severityPrefix(other.mSeverity), other.mShouldLog),
-          std::ostream(&mBuffer) // links the stream buffer with the stream
-          ,
-          mShouldLog(other.mShouldLog), mSeverity(other.mSeverity) {}
+        : LogStreamConsumerBase(severityOstream(other.mSeverity), severityPrefix(other.mSeverity), other.mShouldLog)
+        , std::ostream(&mBuffer) // links the stream buffer with the stream
+        , mShouldLog(other.mShouldLog)
+        , mSeverity(other.mSeverity)
+    {
+    }
 
-    void setReportableSeverity(Severity reportableSeverity) {
+    void setReportableSeverity(Severity reportableSeverity)
+    {
         mShouldLog = mSeverity <= reportableSeverity;
         mBuffer.setShouldLog(mShouldLog);
     }
 
-  private:
-    static std::ostream &severityOstream(Severity severity) {
+private:
+    static std::ostream &severityOstream(Severity severity)
+    {
         return severity >= Severity::kINFO ? std::cout : std::cerr;
     }
 
-    static std::string severityPrefix(Severity severity) {
-        switch (severity) {
+    static std::string severityPrefix(Severity severity)
+    {
+        switch (severity)
+        {
         case Severity::kINTERNAL_ERROR:
             return "[F] ";
         case Severity::kERROR:
@@ -149,7 +180,7 @@ class LogStreamConsumer : protected LogStreamConsumerBase, public std::ostream {
         }
     }
 
-    bool mShouldLog;
+    bool     mShouldLog;
     Severity mSeverity;
 };
 
@@ -177,35 +208,51 @@ class LogStreamConsumer : protected LogStreamConsumerBase, public std::ostream {
 //! class to eliminate the inheritance and instead make the nvinfer1::ILogger implementation a member of the Logger
 //! object.
 
-class RunTimeLogger : public nvinfer1::ILogger {
-
-  public:
-    Severity severity_ = Severity::kVERBOSE;
+class RunTimeLogger : public nvinfer1::ILogger
+{
+public:
+    Severity    severity_;
     std::string name_;
 
-  public:
-    RunTimeLogger(std::string name, Severity severity = Severity::kVERBOSE) : severity_{severity}, name_{name} {}
+public:
+    RunTimeLogger(std::string name, Severity severity = Severity::kVERBOSE)
+        : severity_{severity}
+        , name_{name}
+    {
+    }
 
     RunTimeLogger() {}
 
-    void log(Severity severity, const char *msg) override {
-        LogStreamConsumer(severity_, severity) << this->name_ << " " << std::string(msg) << std::endl;
+    void log(Severity severity, const char *msg) override
+    {
+        LogStreamConsumer(severity_, severity) << "[" << this->name_ << "] " << std::string(msg) << std::endl;
     }
 
-    nvinfer1::ILogger::Severity get_severity() { return this->severity_; }
+    nvinfer1::ILogger::Severity get_severity()
+    {
+        return this->severity_;
+    }
 
-    nvinfer1::ILogger &get_logger() { return *this; }
+    nvinfer1::ILogger &get_logger()
+    {
+        return *this;
+    }
 };
 
-class Logger : public nvinfer1::ILogger {
-  public:
-    Logger(Severity severity = Severity::kWARNING) : mReportableSeverity(severity) {}
+class Logger : public nvinfer1::ILogger
+{
+public:
+    Logger(Severity severity = Severity::kWARNING)
+        : mReportableSeverity(severity)
+    {
+    }
 
     //!
     //! \enum TestResult
     //! \brief Represents the state of a given test
     //!
-    enum class TestResult {
+    enum class TestResult
+    {
         kRUNNING, //!< The test is running
         kPASSED,  //!< The test passed
         kFAILED,  //!< The test failed
@@ -219,7 +266,10 @@ class Logger : public nvinfer1::ILogger {
     //! TODO Once all samples are updated to use this method to register the logger with TensorRT,
     //! we can eliminate the inheritance of Logger from ILogger
     //!
-    nvinfer1::ILogger &getTRTLogger() { return *this; }
+    nvinfer1::ILogger &getTRTLogger()
+    {
+        return *this;
+    }
 
     //!
     //! \brief Implementation of the nvinfer1::ILogger::log() virtual method
@@ -227,7 +277,8 @@ class Logger : public nvinfer1::ILogger {
     //! Note samples should not be calling this function directly; it will eventually go away once we eliminate the
     //! inheritance from nvinfer1::ILogger
     //!
-    void log(Severity severity, const char *msg) override {
+    void log(Severity severity, const char *msg) override
+    {
         LogStreamConsumer(mReportableSeverity, severity) << "[DIHUGE INFERENCE] " << std::string(msg) << std::endl;
     }
 
@@ -236,7 +287,10 @@ class Logger : public nvinfer1::ILogger {
     //!
     //! \param severity The logger will only emit messages that have severity of this level or higher.
     //!
-    void setReportableSeverity(Severity severity) { mReportableSeverity = severity; }
+    void setReportableSeverity(Severity severity)
+    {
+        mReportableSeverity = severity;
+    }
 
     //!
     //! \brief Opaque handle that holds logging information for a particular test
@@ -245,17 +299,22 @@ class Logger : public nvinfer1::ILogger {
     //! The sample must call Logger::defineTest() in order to obtain a TestAtom that can be used
     //! with Logger::reportTest{Start,End}().
     //!
-    class TestAtom {
-      public:
+    class TestAtom
+    {
+    public:
         TestAtom(TestAtom &&) = default;
 
-      private:
+    private:
         friend class Logger;
 
         TestAtom(bool started, const std::string &name, const std::string &cmdline)
-            : mStarted(started), mName(name), mCmdline(cmdline) {}
+            : mStarted(started)
+            , mName(name)
+            , mCmdline(cmdline)
+        {
+        }
 
-        bool mStarted;
+        bool        mStarted;
         std::string mName;
         std::string mCmdline;
     };
@@ -271,7 +330,8 @@ class Logger : public nvinfer1::ILogger {
     //
     //! \return a TestAtom that can be used in Logger::reportTest{Start,End}().
     //!
-    static TestAtom defineTest(const std::string &name, const std::string &cmdline) {
+    static TestAtom defineTest(const std::string &name, const std::string &cmdline)
+    {
         return TestAtom(false, name, cmdline);
     }
 
@@ -284,7 +344,8 @@ class Logger : public nvinfer1::ILogger {
     //! \param[in] argv The array of command-line arguments (given as C strings)
     //!
     //! \return a TestAtom that can be used in Logger::reportTest{Start,End}().
-    static TestAtom defineTest(const std::string &name, int argc, char const *const *argv) {
+    static TestAtom defineTest(const std::string &name, int argc, const char *const *argv)
+    {
         auto cmdline = genCmdlineString(argc, argv);
         return defineTest(name, cmdline);
     }
@@ -296,7 +357,8 @@ class Logger : public nvinfer1::ILogger {
     //!
     //! \param[in] testAtom The handle to the test that has started
     //!
-    static void reportTestStart(TestAtom &testAtom) {
+    static void reportTestStart(TestAtom &testAtom)
+    {
         reportTestResult(testAtom, TestResult::kRUNNING);
         assert(!testAtom.mStarted);
         testAtom.mStarted = true;
@@ -311,39 +373,49 @@ class Logger : public nvinfer1::ILogger {
     //! \param[in] result The result of the test. Should be one of TestResult::kPASSED,
     //!                   TestResult::kFAILED, TestResult::kWAIVED
     //!
-    static void reportTestEnd(const TestAtom &testAtom, TestResult result) {
+    static void reportTestEnd(const TestAtom &testAtom, TestResult result)
+    {
         assert(result != TestResult::kRUNNING);
         assert(testAtom.mStarted);
         reportTestResult(testAtom, result);
     }
 
-    static int reportPass(const TestAtom &testAtom) {
+    static int reportPass(const TestAtom &testAtom)
+    {
         reportTestEnd(testAtom, TestResult::kPASSED);
         return EXIT_SUCCESS;
     }
 
-    static int reportFail(const TestAtom &testAtom) {
+    static int reportFail(const TestAtom &testAtom)
+    {
         reportTestEnd(testAtom, TestResult::kFAILED);
         return EXIT_FAILURE;
     }
 
-    static int reportWaive(const TestAtom &testAtom) {
+    static int reportWaive(const TestAtom &testAtom)
+    {
         reportTestEnd(testAtom, TestResult::kWAIVED);
         return EXIT_SUCCESS;
     }
 
-    static int reportTest(const TestAtom &testAtom, bool pass) {
+    static int reportTest(const TestAtom &testAtom, bool pass)
+    {
         return pass ? reportPass(testAtom) : reportFail(testAtom);
     }
 
-    Severity getReportableSeverity() const { return mReportableSeverity; }
+    Severity getReportableSeverity() const
+    {
+        return mReportableSeverity;
+    }
 
-  private:
+private:
     //!
     //! \brief returns an appropriate string for prefixing a log message with the given severity
     //!
-    static const char *severityPrefix(Severity severity) {
-        switch (severity) {
+    static const char *severityPrefix(Severity severity)
+    {
+        switch (severity)
+        {
         case Severity::kINTERNAL_ERROR:
             return "[F] ";
         case Severity::kERROR:
@@ -363,8 +435,10 @@ class Logger : public nvinfer1::ILogger {
     //!
     //! \brief returns an appropriate string for prefixing a test result message with the given result
     //!
-    static const char *testResultString(TestResult result) {
-        switch (result) {
+    static const char *testResultString(TestResult result)
+    {
+        switch (result)
+        {
         case TestResult::kRUNNING:
             return "RUNNING";
         case TestResult::kPASSED:
@@ -382,14 +456,16 @@ class Logger : public nvinfer1::ILogger {
     //!
     //! \brief returns an appropriate output stream (cout or cerr) to use with the given severity
     //!
-    static std::ostream &severityOstream(Severity severity) {
+    static std::ostream &severityOstream(Severity severity)
+    {
         return severity >= Severity::kINFO ? std::cout : std::cerr;
     }
 
     //!
     //! \brief method that implements logging test results
     //!
-    static void reportTestResult(const TestAtom &testAtom, TestResult result) {
+    static void reportTestResult(const TestAtom &testAtom, TestResult result)
+    {
         severityOstream(Severity::kINFO) << "&&&& " << testResultString(result) << " " << testAtom.mName << " # "
                                          << testAtom.mCmdline << std::endl;
     }
@@ -397,9 +473,11 @@ class Logger : public nvinfer1::ILogger {
     //!
     //! \brief generate a command line string from the given (argc, argv) values
     //!
-    static std::string genCmdlineString(int argc, char const *const *argv) {
+    static std::string genCmdlineString(int argc, const char *const *argv)
+    {
         std::stringstream ss;
-        for (int i = 0; i < argc; i++) {
+        for (int i = 0; i < argc; i++)
+        {
             if (i > 0)
                 ss << " ";
             ss << argv[i];
@@ -419,7 +497,8 @@ namespace {
 //!
 //!     LOG_VERBOSE(logger) << "hello world" << std::endl;
 //!
-inline LogStreamConsumer LOG_VERBOSE(const Logger &logger) {
+inline LogStreamConsumer LOG_VERBOSE(const Logger &logger)
+{
     return LogStreamConsumer(logger.getReportableSeverity(), Severity::kVERBOSE);
 }
 
@@ -430,7 +509,8 @@ inline LogStreamConsumer LOG_VERBOSE(const Logger &logger) {
 //!
 //!     LOG_INFO(logger) << "hello world" << std::endl;
 //!
-inline LogStreamConsumer LOG_INFO(const Logger &logger) {
+inline LogStreamConsumer LOG_INFO(const Logger &logger)
+{
     return LogStreamConsumer(logger.getReportableSeverity(), Severity::kINFO);
 }
 
@@ -441,7 +521,8 @@ inline LogStreamConsumer LOG_INFO(const Logger &logger) {
 //!
 //!     LOG_WARN(logger) << "hello world" << std::endl;
 //!
-inline LogStreamConsumer LOG_WARN(const Logger &logger) {
+inline LogStreamConsumer LOG_WARN(const Logger &logger)
+{
     return LogStreamConsumer(logger.getReportableSeverity(), Severity::kWARNING);
 }
 
@@ -452,7 +533,8 @@ inline LogStreamConsumer LOG_WARN(const Logger &logger) {
 //!
 //!     LOG_ERROR(logger) << "hello world" << std::endl;
 //!
-inline LogStreamConsumer LOG_ERROR(const Logger &logger) {
+inline LogStreamConsumer LOG_ERROR(const Logger &logger)
+{
     return LogStreamConsumer(logger.getReportableSeverity(), Severity::kERROR);
 }
 
@@ -464,7 +546,8 @@ inline LogStreamConsumer LOG_ERROR(const Logger &logger) {
 //!
 //!     LOG_FATAL(logger) << "hello world" << std::endl;
 //!
-inline LogStreamConsumer LOG_FATAL(const Logger &logger) {
+inline LogStreamConsumer LOG_FATAL(const Logger &logger)
+{
     return LogStreamConsumer(logger.getReportableSeverity(), Severity::kINTERNAL_ERROR);
 }
 
