@@ -1,3 +1,2 @@
-include_directories(.)
-add_subdirectory(cucv_test)
-add_subdirectory(utils_test)
+add_subdirectory(cuda)
+add_subdirectory(utils)

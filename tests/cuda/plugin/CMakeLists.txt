@@ -1,8 +1,7 @@
 file(GLOB SRCS *.cpp)
 
-message(${SRCS})
 
-add_executable(cucv_test
+add_executable(tensorrt_plugin_test
     ${SRCS}
 )
 
@@ -12,11 +11,11 @@ include_directories(
 )
 
 
-target_link_libraries(cucv_test 
+target_link_libraries(tensorrt_plugin_test 
 PUBLIC
     GTest::gtest_main
     GTest::gmock
-    cucv_headers
+    tensorrt_plugin_headers
 PRIVATE
-    cucv_plugin
+    tensorrt_plugin
 )

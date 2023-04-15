@@ -1,4 +1,4 @@
-set(TARGET_NAME cucv_plugin)
+set(TARGET_NAME tensorrt_plugin)
 set(SHARED_TARGET ${TARGET_NAME})
 set(STATIC_TARGET ${TARGET_NAME}_static)
 
@@ -24,13 +24,10 @@ set_source_files_properties(${PLUGIN_CU_SOURCES} PROPERTIES COMPILE_FLAGS "${GEN
 list(APPEND PLUGIN_SOURCES "${PLUGIN_CU_SOURCES}")
 
 ################################## SHARED LIBRARY #######################################
-message("${SHARED_TARGET} PLUGIN_SOURCES ${PLUGIN_SOURCES}")
 add_library(${SHARED_TARGET} SHARED
     ${PLUGIN_SOURCES}
 )
 
-message("cuda include: ${CUDAToolkit_INCLUDE_DIRS}")
-message("TensorRT include: ${TensorRT_INCLUDE_DIRS}")
 include_directories(
     ${CUDA_INCLUDE_DIRS}
     ${TensorRT_INCLUDE_DIRS}

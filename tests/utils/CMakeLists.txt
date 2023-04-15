@@ -1,6 +1,5 @@
 file(GLOB SRCS *.cpp)
 
-message(${SRCS})
 
 add_executable(utils_test
     ${SRCS}

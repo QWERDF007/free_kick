@@ -1,2 +1,2 @@
 add_subdirectory(utils)
-add_subdirectory(cucv)
+add_subdirectory(cuda)

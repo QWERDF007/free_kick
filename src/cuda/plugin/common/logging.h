@@ -223,7 +223,7 @@ public:
 
     RunTimeLogger() {}
 
-    void log(Severity severity, const char *msg) override
+    void log(Severity severity, const char *msg) noexcept override
     {
         LogStreamConsumer(severity_, severity) << "[" << this->name_ << "] " << std::string(msg) << std::endl;
     }
@@ -277,9 +277,9 @@ public:
     //! Note samples should not be calling this function directly; it will eventually go away once we eliminate the
     //! inheritance from nvinfer1::ILogger
     //!
-    void log(Severity severity, const char *msg) override
+    void log(Severity severity, const char *msg) noexcept override
     {
-        LogStreamConsumer(mReportableSeverity, severity) << "[DIHUGE INFERENCE] " << std::string(msg) << std::endl;
+        LogStreamConsumer(mReportableSeverity, severity) << std::string(msg) << std::endl;
     }
 
     //!
