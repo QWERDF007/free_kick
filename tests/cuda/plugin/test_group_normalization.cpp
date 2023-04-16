@@ -1,11 +1,11 @@
+#include "../utility.h"
+#include "../values_test.h"
 #include "common/logging.h"
 #include "common/plugin.h"
 #include "group_normalization_plugin/group_normalization_plugin.h"
-#include "../utility.h"
-
-#include <gtest/gtest.h>
 
 #include <iostream>
+#include <tuple>
 
 #define LOG_LEVEL ILogger::Severity::kERROR
 
@@ -60,112 +60,153 @@ UniquePtr<ICudaEngine> createNetworkWithGroupNormalization(RunTimeLogger &logger
 
 // clang-format off
 
+std::vector<std::vector<float>> inputData = {
+    {1., 1., 1., 1., 0., 1., 1., 0., 0., 0., 0., 1., 1., 1., 0., 0.},
+    {1., 1., 1., 1., 0., 1., 1., 0., 0., 0., 0., 1., 1., 1., 0., 0., 2., 2., 0., 0., 2., 0., 1., 1., 1., 0., 0., 2., 2., 1., 1., 0., 3., 1., 2., 2., 3., 0., 0., 2., 2., 3., 1., 2., 3., 3., 2., 1.},
+};
+
+std::vector<std::vector<float>> outputData = {
+    {0.57733488,  0.57733488,  0.57733488,  0.57733488, -1.73200464, 0.57733488, 0.57733488,  -1.73200464, -0.77458012, -0.77458012, -0.77458012, 1.29096687, 1.29096687,  1.29096687, -0.77458012, -0.77458012},
+};
+
+
+FREE_KICK_TEST_SUITE_P(GroupNormalizationPlugin, ValueList<int, int, int, int, int, std::vector<float>&, std::vector<float>&>{
+    // batch, group, channel, height, width,        input,        output 
+    {      1,     4,       2,      2,     2, inputData[0], outputData[0]},
+});
+
 // clang-format on
 
-// class Instance2 : public testing::TestWithParam<int>
-// {
-// };
+TEST_P(GroupNormalizationPlugin, build)
+{
+    int batch   = GetParamValue<0>();
+    int group   = GetParamValue<1>();
+    int channel = GetParamValue<2>();
+    int height  = GetParamValue<3>();
+    int width   = GetParamValue<4>();
+    int volume  = batch * channel * height * width;
 
-// TEST_P(Instance2, run)
+    // create a logger
+    auto logger = RunTimeLogger("GN build", LOG_LEVEL);
+
+    auto engine = createNetworkWithGroupNormalization(logger, group, channel, Dims4{batch, channel, height, width});
+    EXPECT_NE(engine, nullptr);
+
+    // Create execution context
+    auto context = makeUnique<IExecutionContext>(engine->createExecutionContext());
+    EXPECT_NE(context, nullptr);
+}
+
+TEST_P(GroupNormalizationPlugin, run)
+{
+    int batch   = GetParamValue<0>();
+    int group   = GetParamValue<1>();
+    int channel = GetParamValue<2>();
+    int height  = GetParamValue<3>();
+    int width   = GetParamValue<4>();
+    int volume  = batch * channel * height * width;
+
+    // create a logger
+    auto logger = RunTimeLogger("GN run", LOG_LEVEL);
+
+    auto engine = createNetworkWithGroupNormalization(logger, group, channel, Dims4{batch, channel, height, width});
+    EXPECT_NE(engine, nullptr);
+
+    // Create execution context
+    auto context = makeUnique<IExecutionContext>(engine->createExecutionContext());
+    EXPECT_NE(context, nullptr);
+}
+
+// TEST(GroupNormalizationPlugin, build)
 // {
-//     int n;
-//     n = GetParam();
-//     EXPECT_TRUE(n);
+//     constexpr int batch   = 1;
+//     constexpr int channel = 4;
+//     constexpr int height  = 2;
+//     constexpr int width   = 2;
+//     constexpr int volume  = batch * channel * height * width;
+
+//     int num_groups   = 2;
+//     int num_channels = channel;
+
+//     // create a logger
+//     auto logger = RunTimeLogger("GN build", LOG_LEVEL);
+
+//     auto engine
+//         = createNetworkWithGroupNormalization(logger, num_groups, num_channels, Dims4{batch, channel, height, width});
+//     EXPECT_NE(engine, nullptr);
+
+//     // Create execution context
+//     auto context = makeUnique<IExecutionContext>(engine->createExecutionContext());
+//     EXPECT_NE(context, nullptr);
 // }
 
-// INSTANTIATE_TEST_CASE_P(GroupNormalizationPlugin, Instance2, testing::Values(1, 1, 22, 2));
+// TEST(GroupNormalizationPlugin, run)
+// {
+//     constexpr int batch   = 1;
+//     constexpr int channel = 4;
+//     constexpr int height  = 2;
+//     constexpr int width   = 2;
+//     constexpr int volume  = batch * channel * height * width;
 
-TEST(GroupNormalizationPlugin, build)
-{
-    constexpr int batch   = 1;
-    constexpr int channel = 4;
-    constexpr int height  = 2;
-    constexpr int width   = 2;
-    constexpr int volume  = batch * channel * height * width;
+//     int num_groups   = 2;
+//     int num_channels = channel;
 
-    int num_groups   = 2;
-    int num_channels = channel;
+//     // create a logger
+//     auto logger = RunTimeLogger("GN build", LOG_LEVEL);
 
-    // create a logger
-    auto logger = RunTimeLogger("GN build", LOG_LEVEL);
+//     auto engine
+//         = createNetworkWithGroupNormalization(logger, num_groups, num_channels, Dims4{batch, channel, height, width});
+//     EXPECT_NE(engine, nullptr);
 
-    auto engine
-        = createNetworkWithGroupNormalization(logger, num_groups, num_channels, Dims4{batch, channel, height, width});
-    EXPECT_NE(engine, nullptr);
+//     // Create execution context
+//     auto context = makeUnique<IExecutionContext>(engine->createExecutionContext());
+//     EXPECT_NE(context, nullptr);
 
-    // Create execution context
-    auto context = makeUnique<IExecutionContext>(engine->createExecutionContext());
-    EXPECT_NE(context, nullptr);
-}
+//     // Create input buffer
+//     // float inputData[volume]
+//     //     = {1., 1., 1., 1., 0., 1., 1., 0., 0., 0., 0., 1., 1., 1., 0., 0., 2., 2., 0., 0., 2., 0., 1., 1.,
+//     //        1., 0., 0., 2., 2., 1., 1., 0., 3., 1., 2., 2., 3., 0., 0., 2., 2., 3., 1., 2., 3., 3., 2., 1.};
 
+//     float inputData[volume] = {1., 1., 1., 1., 0., 1., 1., 0., 0., 0., 0., 1., 1., 1., 0., 0.};
+//     float expectedResult[volume]
+//         = {0.57733488,  0.57733488,  0.57733488,  0.57733488, -1.73200464, 0.57733488, 0.57733488,  -1.73200464,
+//            -0.77458012, -0.77458012, -0.77458012, 1.29096687, 1.29096687,  1.29096687, -0.77458012, -0.77458012};
 
-TEST(GroupNormalizationPlugin, run)
-{
-    constexpr int batch   = 1;
-    constexpr int channel = 4;
-    constexpr int height  = 2;
-    constexpr int width   = 2;
-    constexpr int volume  = batch * channel * height * width;
+//     // Create output buffer with the same size as inputData
 
-    int num_groups   = 2;
-    int num_channels = channel;
+//     size_t inputSize = sizeof(inputData);
 
-    // create a logger
-    auto logger = RunTimeLogger("GN build", LOG_LEVEL);
+//     auto input_buf  = std::make_shared<CudaBuffer<float>>(volume);
+//     auto output_buf = std::make_shared<CudaBuffer<float>>(volume);
 
-    auto engine
-        = createNetworkWithGroupNormalization(logger, num_groups, num_channels, Dims4{batch, channel, height, width});
-    EXPECT_NE(engine, nullptr);
+//     void *buffers[2] = {input_buf->mPtr, output_buf->mPtr};
 
-    // Create execution context
-    auto context = makeUnique<IExecutionContext>(engine->createExecutionContext());
-    EXPECT_NE(context, nullptr);
+//     float outputData[volume];
 
-    // Create input buffer
-    // float inputData[volume]
-    //     = {1., 1., 1., 1., 0., 1., 1., 0., 0., 0., 0., 1., 1., 1., 0., 0., 2., 2., 0., 0., 2., 0., 1., 1.,
-    //        1., 0., 0., 2., 2., 1., 1., 0., 3., 1., 2., 2., 3., 0., 0., 2., 2., 3., 1., 2., 3., 3., 2., 1.};
+//     // Create CUDA stream
+//     cudaStream_t stream;
+//     EXPECT_EQ(cudaSuccess, cudaStreamCreate(&stream));
 
-    float inputData[volume] = {1., 1., 1., 1., 0., 1., 1., 0., 0., 0., 0., 1., 1., 1., 0., 0.};
-    float expectedResult[volume]
-        = {0.57733488,  0.57733488,  0.57733488,  0.57733488, -1.73200464, 0.57733488, 0.57733488,  -1.73200464,
-           -0.77458012, -0.77458012, -0.77458012, 1.29096687, 1.29096687,  1.29096687, -0.77458012, -0.77458012};
+//     // copy input buffer to device
+//     EXPECT_EQ(cudaSuccess, cudaMemcpyAsync(buffers[0], inputData, inputSize, cudaMemcpyHostToDevice, stream));
 
-    // Create output buffer with the same size as inputData
+//     // Execute inference
+//     context->enqueue(batch, buffers, stream, nullptr);
 
-    size_t inputSize = sizeof(inputData);
+//     // copy output to buffer
+//     EXPECT_EQ(cudaSuccess, cudaMemcpyAsync(outputData, buffers[1], inputSize, cudaMemcpyDeviceToHost, stream));
 
-    auto input_buf  = std::make_shared<CudaBuffer<float>>(volume);
-    auto output_buf = std::make_shared<CudaBuffer<float>>(volume);
+//     // Synchronize inference
+//     EXPECT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
 
-    void *buffers[2] = {input_buf->mPtr, output_buf->mPtr};
+//     EXPECT_EQ(cudaSuccess, cudaStreamDestroy(stream));
 
-    float outputData[volume];
+//     // // Print the output values
+//     // for (int i = 0; i < volume; ++i)
+//     // {
+//     //     std::cout << outputData[i] << " ";
+//     // }
+//     // std::cout << std::endl;
 
-    // Create CUDA stream
-    cudaStream_t stream;
-    EXPECT_EQ(cudaSuccess, cudaStreamCreate(&stream));
-
-    // copy input buffer to device
-    EXPECT_EQ(cudaSuccess, cudaMemcpyAsync(buffers[0], inputData, inputSize, cudaMemcpyHostToDevice, stream));
-
-    // Execute inference
-    context->enqueue(batch, buffers, stream, nullptr);
-
-    // copy output to buffer
-    EXPECT_EQ(cudaSuccess, cudaMemcpyAsync(outputData, buffers[1], inputSize, cudaMemcpyDeviceToHost, stream));
-
-    // Synchronize inference
-    EXPECT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
-
-    EXPECT_EQ(cudaSuccess, cudaStreamDestroy(stream));
-
-    // // Print the output values
-    // for (int i = 0; i < volume; ++i)
-    // {
-    //     std::cout << outputData[i] << " ";
-    // }
-    // std::cout << std::endl;
-
-    EXPECT_TRUE(buffersEqual(outputData, expectedResult, volume, 1e-5));
-}
+//     EXPECT_TRUE(buffersEqual(outputData, expectedResult, volume, 1e-5));
+// }

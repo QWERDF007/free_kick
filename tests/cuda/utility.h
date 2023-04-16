@@ -1,8 +1,13 @@
 
 
 #pragma once
+#include "NvInferRuntime.h"
+
 #include <cmath>
+#include <iostream>
 #include <numeric>
+#include <vector>
+
 
 // Use the CUDA runtime API to check for errors during kernel launches.
 #define CUDA_CHECK(call)                                                                     \
