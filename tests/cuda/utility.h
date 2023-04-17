@@ -8,7 +8,6 @@
 #include <numeric>
 #include <vector>
 
-
 // Use the CUDA runtime API to check for errors during kernel launches.
 #define CUDA_CHECK(call)                                                                     \
     do                                                                                       \
@@ -37,7 +36,7 @@ inline bool buffersEqual(const void *buf1, const void *buf2, size_t size, float 
     const float *f2 = static_cast<const float *>(buf2);
 
     std::vector<std::pair<float, float>> unmatched_buf;
-    for (size_t i = 0; i < size / sizeof(float); ++i)
+    for (size_t i = 0; i < size; ++i)
     {
         if (std::abs(f1[i] - f2[i]) > tolerance)
         {
@@ -46,6 +45,21 @@ inline bool buffersEqual(const void *buf1, const void *buf2, size_t size, float 
         }
     }
 
+    return unmatched_buf.size() > 0 ? false : true;
+}
+
+template<typename T>
+inline bool buffersEqual(const std::vector<T> &buf1, const std::vector<T> &buf2, size_t size, float tolerance)
+{
+    std::vector<std::pair<float, float>> unmatched_buf;
+    for (size_t i = 0; i < size; ++i)
+    {
+        if (std::abs(buf1[i] - buf2[i]) > tolerance)
+        {
+            unmatched_buf.emplace_back(buf1[i], buf2[i]);
+            std::cout << buf1[i] << " " << buf2[i] << std::endl;
+        }
+    }
     return unmatched_buf.size() > 0 ? false : true;
 }
 
