@@ -1,5 +1,5 @@
 if (WIN32)
-    set(TensorRT_ROOT E:/DevLib/TensorRT-7.2.3.4)
+    set(TensorRT_ROOT D:/Software/dev/TensorRT-7.2.3.4)
     set(TensorRT_INCLUDE_DIRS ${TensorRT_ROOT}/include)
     set(TensorRT_LIBRARY_DIRS ${TensorRT_ROOT}/lib)
     find_library(NVINFER_LIB nvinfer HINTS ${TensorRT_LIBRARY_DIRS})

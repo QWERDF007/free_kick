@@ -35,3 +35,6 @@
 build/
 bin/
 .vscode
+*.wts
+*.pt
+*.pth
