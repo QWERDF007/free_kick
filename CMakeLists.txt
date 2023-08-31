@@ -8,15 +8,18 @@ project(free_kick
 
 enable_language(CUDA)
 
-set(CMAKE_CXX_STANDARD 17)
 
 # Options to configure the build tree =======
-option(BUILD_SAMPLES "Enable samples" OFF)
+option(BUILD_SAMPLES "Enable samples" ON)
 option(BUILD_TESTS "Enable testsuite" ON)
 option(BUILD_DOCS "Enable docs" OFF)
+option(ENABLE_SANITIZER "Enabled sanitized build" OFF)
 
 # Configure build tree ======================
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" )
+
+include(ConfigBuildTree)
+include(ConfigCompiler)
 include(ConfigCUDA)
 include(ConfigTensorRT)
 
@@ -37,4 +40,6 @@ if(BUILD_SAMPLES)
     add_subdirectory(samples)
 endif()
 
+
+message(STATUS "")
 include(PrintConfig)
