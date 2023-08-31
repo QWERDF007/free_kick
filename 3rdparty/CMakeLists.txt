@@ -16,4 +16,4 @@ if(BUILD_TESTS)
 endif()
 
 # pybind11 -----------------------------
-# set(PYBIND11_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/pybind11" PARENT_SCOPE)
+set(PYBIND11_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/pybind11" PARENT_SCOPE)
