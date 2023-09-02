@@ -29,16 +29,19 @@ else ()
     set(C_WARNING_FLAGS "-Wall -Wno-unknown-pragmas -Wpointer-arith -Wmissing-declarations -Wredundant-decls -Wmultichar -Wno-unused-local-typedefs -Wunused")
     # 派生类中的虚函数声明中建议使用 override 关键字
     set(CXX_WARNING_FLAGS "-Wsuggest-override")
+    # 禁止编译器在比较两个常量时发出警告
+    set(CUDA_WARNING_FLAGS "-Wno-tautological-compare")
 endif ()
-
-# 禁止编译器在比较两个常量时发出警告
-set(CUDA_WARNING_FLAGS "-Wno-tautological-compare")
 
 # 设置 C++ 和 C 编译标志
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${C_WARNING_ERROR_FLAG} ${C_WARNING_FLAGS} ${CXX_WARNING_FLAGS}")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${C_WARNING_ERROR_FLAG} ${C_WARNING_FLAGS}")
 # 设置 CUDA 编译标志
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${CUDA_WARNING_ERROR_FLAG} ${C_WARNING_FLAGS} ${CXX_WARNING_FLAGS} ${CUDA_WARNING_FLAGS}")
+if (MSVC)
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${CUDA_WARNING_ERROR_FLAG} ${CUDA_WARNING_FLAGS}")
+else ()
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} ${CUDA_WARNING_ERROR_FLAG} ${C_WARNING_FLAGS} ${CXX_WARNING_FLAGS} ${CUDA_WARNING_FLAGS}")
+endif ()
 
 # 如果使用 GCC, 确保版本不低于 GCC 9.4, 否则给出错误并终止配置
 # if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9.4)
