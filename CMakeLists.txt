@@ -24,13 +24,17 @@ include(ConfigCompiler)
 include(ConfigCUDA)
 include(ConfigTensorRT)
 
+if(BUILD_PYTHON)
+    include(ConfigPython)
+endif()
+
 # Define the build tree ====================
 add_subdirectory(3rdparty EXCLUDE_FROM_ALL)
 
 add_subdirectory(src)
 
 if(BUILD_PYTHON)
-    add_subdirectory(python)
+    include(BuildPython)
 endif()
 
 if(BUILD_TESTS)
