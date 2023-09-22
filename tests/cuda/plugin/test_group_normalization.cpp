@@ -1,5 +1,5 @@
 #include "../utility.h"
-#include "../values_test.h"
+#include "../../values_test.h"
 #include "common/logging.h"
 #include "common/plugin.h"
 #include "group_normalization_plugin/group_normalization_plugin.h"
