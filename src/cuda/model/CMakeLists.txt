@@ -29,7 +29,7 @@ add_library(${SHARED_TARGET} SHARED
 )
 
 include_directories(
-    ${CUDA_INCLUDE_DIRS}
+    ${CUDAToolkit_INCLUDE_DIRS}
     ${TensorRT_INCLUDE_DIRS}
 )
 

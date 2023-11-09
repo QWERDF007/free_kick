@@ -6,7 +6,7 @@ add_executable(tensorrt_model_test
 )
 
 include_directories(
-    ${CUDA_INCLUDE_DIRS}
+    ${CUDAToolkit_INCLUDE_DIRS}
     ${TensorRT_INCLUDE_DIRS}
 )
 
