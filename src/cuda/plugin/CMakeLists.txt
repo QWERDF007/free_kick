@@ -29,14 +29,13 @@ add_library(${SHARED_TARGET} SHARED
 )
 
 include_directories(
-    ${CUDA_INCLUDE_DIRS}
+    ${CUDAToolkit_INCLUDE_DIRS}
     ${TensorRT_INCLUDE_DIRS}
 )
 
 
 target_link_libraries(${SHARED_TARGET} PUBLIC
-    ${NVINFER_LIB}
-    ${NVINFER_PLUGIN_LIB}
+    ${TensorRT_LIBS}
     # ${MYELIN64_1_LIB}
     CUDA::cudart
     # CUDA::nvrtc

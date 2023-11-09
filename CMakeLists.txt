@@ -23,6 +23,7 @@ include(ConfigBuildTree)
 include(ConfigCompiler)
 include(ConfigCUDA)
 include(ConfigTensorRT)
+include(ConfigOpenCV)
 
 if(BUILD_PYTHON)
     include(ConfigPython)
