@@ -1,6 +1,7 @@
 #pragma once
 
 #include <random>
+#include <type_traits>
 #include <vector>
 
 namespace free_kick::utils {
@@ -12,7 +13,7 @@ T clamp(T value, T min, T max)
 }
 
 /**
- * @brief 生成一组随机数
+ * @brief 生成一组浮点随机数
  * 
  * @tparam T 
  * @param min
@@ -21,7 +22,7 @@ T clamp(T value, T min, T max)
  * @return std::vector<T> 
  */
 template<typename T>
-std::vector<T> random(T min, T max, size_t count)
+typename std::enable_if<std::is_floating_point<T>::value, std::vector<T>>::type random(T min, T max, size_t count)
 {
     std::vector<T> result;
     result.reserve(count);
@@ -29,6 +30,27 @@ std::vector<T> random(T min, T max, size_t count)
     std::random_device               rd;
     std::mt19937                     gen(rd());
     std::uniform_real_distribution<> dis(min, max);
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        result.push_back(dis(gen));
+    }
+
+    return result;
+}
+
+/**
+ * @brief 生成一组整形随机数
+ */
+template<typename T>
+typename std::enable_if<std::is_integral<T>::value, std::vector<T>>::type random(T min, T max, size_t count)
+{
+    std::vector<T> result;
+    result.reserve(count);
+
+    std::random_device              rd;
+    std::mt19937                    gen(rd());
+    std::uniform_int_distribution<> dis(min, max);
 
     for (size_t i = 0; i < count; ++i)
     {
