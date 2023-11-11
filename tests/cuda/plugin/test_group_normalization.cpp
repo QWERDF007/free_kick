@@ -50,6 +50,7 @@ UniquePtr<ICudaEngine> createNetworkWithGroupNormalization(RunTimeLogger &logger
     builder->setMaxBatchSize(batchSize);
     builder->setMaxWorkspaceSize(1 << 30);
     auto engine = makeUnique<ICudaEngine>(builder->buildCudaEngine(*network));
+    // auto engine = makeUnique<ICudaEngine>(builder->buildEngineWithConfig(*network, *builder->createBuilderConfig()));
     EXPECT_NE(engine, nullptr);
 
     // Destroy network and builder
