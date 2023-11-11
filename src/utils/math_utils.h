@@ -22,14 +22,14 @@ T clamp(T value, T min, T max)
  * @return std::vector<T> 
  */
 template<typename T>
-typename std::enable_if<std::is_floating_point<T>::value, std::vector<T>>::type random(T min, T max, size_t count)
+std::vector<T> random(T min, T max, size_t count)
 {
     std::vector<T> result;
     result.reserve(count);
 
-    std::random_device               rd;
-    std::mt19937                     gen(rd());
-    std::uniform_real_distribution<> dis(min, max);
+    std::random_device rd;
+    std::mt19937       gen(rd());
+    auto               dis = uniform_distribution<T>(min, max);
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -39,25 +39,18 @@ typename std::enable_if<std::is_floating_point<T>::value, std::vector<T>>::type 
     return result;
 }
 
-/**
- * @brief 生成一组整形随机数
- */
 template<typename T>
-typename std::enable_if<std::is_integral<T>::value, std::vector<T>>::type random(T min, T max, size_t count)
+typename std::enable_if<std::is_integral<T>::value, std::uniform_int_distribution<>>::type uniform_distribution(T min,
+                                                                                                                T max)
 {
-    std::vector<T> result;
-    result.reserve(count);
+    return std::uniform_int_distribution<>(min, max);
+}
 
-    std::random_device              rd;
-    std::mt19937                    gen(rd());
-    std::uniform_int_distribution<> dis(min, max);
-
-    for (size_t i = 0; i < count; ++i)
-    {
-        result.push_back(dis(gen));
-    }
-
-    return result;
+template<typename T>
+typename std::enable_if<std::is_floating_point<T>::value, std::uniform_real_distribution<>>::type uniform_distribution(
+    T min, T max)
+{
+    return std::uniform_real_distribution<>(min, max);
 }
 
 } // namespace free_kick::utils
