@@ -40,15 +40,13 @@ std::vector<T> random(T min, T max, size_t count)
 }
 
 template<typename T>
-typename std::enable_if<std::is_integral<T>::value, std::uniform_int_distribution<>>::type uniform_distribution(T min,
-                                                                                                                T max)
+std::enable_if_t<std::is_integral<T>::value, std::uniform_int_distribution<>> uniform_distribution(T min, T max)
 {
     return std::uniform_int_distribution<>(min, max);
 }
 
 template<typename T>
-typename std::enable_if<std::is_floating_point<T>::value, std::uniform_real_distribution<>>::type uniform_distribution(
-    T min, T max)
+std::enable_if_t<std::is_floating_point<T>::value, std::uniform_real_distribution<>> uniform_distribution(T min, T max)
 {
     return std::uniform_real_distribution<>(min, max);
 }
