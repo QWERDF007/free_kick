@@ -3,14 +3,10 @@
 
 #include <string>
 
-namespace free_kick
-{
+namespace free_kick::utils {
 
-std::string strip(const std::string &str);    
+std::string strip(const std::string &str);
 
-} // namespace free_kick
-
-
-
+} // namespace free_kick::utils
 
 #endif
