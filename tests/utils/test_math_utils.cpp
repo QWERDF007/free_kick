@@ -5,7 +5,7 @@
 
 // clang-format off
 
-FREE_KICK_TEST_SUITE_P(MathUtilsTest, ValueList<size_t, int, int, double, double>
+FREE_KICK_TEST_SUITE_P(MathRandomArrayTest, ValueList<size_t, int, int, double, double>
 {
     // total,  min,    max, min,    max,
     {      0,    0,     0,   0.,     0.,},
@@ -16,7 +16,7 @@ FREE_KICK_TEST_SUITE_P(MathUtilsTest, ValueList<size_t, int, int, double, double
 
 // clang-format on
 
-TEST_P(MathUtilsTest, random_array)
+TEST_P(MathRandomArrayTest, random_array)
 {
     const size_t total      = GetParamValue<0>();
     const int    int_min    = GetParamValue<1>();
