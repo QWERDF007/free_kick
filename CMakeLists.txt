@@ -15,6 +15,7 @@ option(BUILD_TESTS "Enable testsuite" ON)
 option(BUILD_DOCS "Enable docs" OFF)
 option(ENABLE_SANITIZER "Enabled sanitized build" OFF)
 option(BUILD_PYTHON "Build python bindings" ON)
+option(BUILD_BENCHMARK "Build benchmark" ON)
 
 # Configure build tree ======================
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" )
@@ -48,6 +49,10 @@ endif()
 
 if(BUILD_SAMPLES)
     add_subdirectory(samples)
+endif()
+
+if(BUILD_BENCHMARK)
+    add_subdirectory(benchmark)
 endif()
 
 

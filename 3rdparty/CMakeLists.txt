@@ -17,3 +17,10 @@ endif()
 
 # pybind11 -----------------------------
 set(PYBIND11_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/pybind11" PARENT_SCOPE)
+
+# benchmark
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable benchmark testing.")
+set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "Disable benchmark install to avoid overwriting vendor install.")
+if(BUILD_BENCHMARK)
+    add_subdirectory(benchmark)
+endif()
