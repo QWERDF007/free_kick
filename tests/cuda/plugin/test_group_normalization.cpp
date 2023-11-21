@@ -1,11 +1,12 @@
-#include "../utility.h"
 #include "../../values_test.h"
+#include "../utility.h"
 #include "common/logging.h"
 #include "common/plugin.h"
 #include "group_normalization_plugin/group_normalization_plugin.h"
 
 #include <iostream>
 #include <tuple>
+
 
 #define LOG_LEVEL ILogger::Severity::kERROR
 
@@ -48,9 +49,12 @@ UniquePtr<ICudaEngine> createNetworkWithGroupNormalization(RunTimeLogger &logger
 
     // Build engine
     builder->setMaxBatchSize(batchSize);
+#if TensorRT_VERSION_MAJOR == 7
     builder->setMaxWorkspaceSize(1 << 30);
     auto engine = makeUnique<ICudaEngine>(builder->buildCudaEngine(*network));
-    // auto engine = makeUnique<ICudaEngine>(builder->buildEngineWithConfig(*network, *builder->createBuilderConfig()));
+#else
+    auto engine = makeUnique<ICudaEngine>(builder->buildEngineWithConfig(*network, *builder->createBuilderConfig()));
+#endif
     EXPECT_NE(engine, nullptr);
 
     // Destroy network and builder
