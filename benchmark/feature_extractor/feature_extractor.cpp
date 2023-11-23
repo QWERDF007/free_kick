@@ -50,5 +50,6 @@ int FeatureExtractor::initModel(const std::string &engine_path)
 
 int FeatureExtractor::initData()
 {
-    engine_->getbin
+    // engine_->getbin
+    return 0;
 }
