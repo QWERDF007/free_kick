@@ -54,8 +54,8 @@ void add(std::vector<std::any> &inputs, std::vector<std::any> &outputs)
 
 int main(int argc, char *argv[])
 {
-    // InstanceFactor::GetInstance()->registerFuncPtr("func1", func1);
-    // InstanceFactor::GetInstance()->registerFuncPtr("add", add);
+    InstanceFactor::GetInstance()->registerFuncPtr("func1", func1);
+    InstanceFactor::GetInstance()->registerFuncPtr("add", add);
 
     REGISTER_FUNCTION(func1, func1);
     REGISTER_FUNCTION(add, add);
@@ -64,5 +64,6 @@ int main(int argc, char *argv[])
     std::vector<std::any> outputs;
     InstanceFactor::GetInstance()->getFuncPtr("func1")(inputs, outputs);
     InstanceFactor::GetInstance()->getFuncPtr("add")(inputs, outputs);
+
     return 0;
 }
