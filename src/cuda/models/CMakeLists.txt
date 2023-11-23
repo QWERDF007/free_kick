@@ -1,4 +1,4 @@
-set(TARGET_NAME tensorrt_model)
+set(TARGET_NAME tensorrt_models)
 set(SHARED_TARGET ${TARGET_NAME})
 set(STATIC_TARGET ${TARGET_NAME}_static)
 

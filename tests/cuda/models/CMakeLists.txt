@@ -17,5 +17,5 @@ PUBLIC
     GTest::gmock
     tensorrt_models_headers
 PRIVATE
-    tensorrt_model
+    tensorrt_models
 )
