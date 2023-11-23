@@ -15,7 +15,7 @@ target_link_libraries(tensorrt_plugin_test
 PUBLIC
     GTest::gtest_main
     GTest::gmock
-    tensorrt_plugin_headers
+    tensorrt_plugins_headers
 PRIVATE
     tensorrt_plugin
 )

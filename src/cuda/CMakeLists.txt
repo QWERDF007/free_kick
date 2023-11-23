@@ -1,18 +1,18 @@
 # TensorRT plugin
-add_subdirectory(plugin)
+add_subdirectory(plugins)
 
 # header
-add_library(tensorrt_plugin_headers INTERFACE)
-target_include_directories(tensorrt_plugin_headers INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/plugin
+add_library(tensorrt_plugins_headers INTERFACE)
+target_include_directories(tensorrt_plugins_headers INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/plugins
 )
 
 
 # TensorRT models
-add_subdirectory(model)
+add_subdirectory(models)
 
 # header
-add_library(tensorrt_model_headers INTERFACE)
-target_include_directories(tensorrt_model_headers INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/model
+add_library(tensorrt_models_headers INTERFACE)
+target_include_directories(tensorrt_models_headers INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/models
 )
