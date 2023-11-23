@@ -1,4 +1,5 @@
-set(OpenCV_DIR "D:/Software/dev/opencv-4.5.5/build/x64/vc14/lib")
+set(OpenCV_HOME "H:/Software/opencv/build/x64/vc16")
+set(OpenCV_DIR "${OpenCV_HOME}/lib") # dir contain .cmake
 set(OpenCV_LIBRARY_DIR ${OpenCV_DIR})
-set(OpenCV_BIN_DIR "D:/Software/dev/opencv-4.5.5/build/x64/vc14/bin")
+set(OpenCV_BIN_DIR "${OpenCV_HOME}/bin")
 find_package(OpenCV REQUIRED) 
