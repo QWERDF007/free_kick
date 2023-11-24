@@ -14,13 +14,11 @@
 
 using namespace nvinfer1;
 
-UniquePtr<ICudaEngine> createNetworkWithGroupNormalization(RunTimeLogger &logger, int num_groups, int num_channels,
-                                                           Dims4 input_dims)
+UniquePtr<ICudaEngine> createNetworkWithGroupNormalization(UniquePtr<IBuilder> &builder, RunTimeLogger &logger,
+                                                           int num_groups, int num_channels, Dims4 input_dims)
 {
     int batchSize = input_dims.d[0];
 
-    // Create a TensorRT engine
-    auto builder = makeUnique<IBuilder>(createInferBuilder(logger));
     EXPECT_NE(builder, nullptr);
 
     // Create network
@@ -216,7 +214,11 @@ TEST_P(GroupNormalizationPlugin, run)
     // create a logger
     auto logger = RunTimeLogger("GN run", LOG_LEVEL);
 
-    auto engine = createNetworkWithGroupNormalization(logger, group, channel, Dims4{batch, channel, height, width});
+    // Create a TensorRT engine
+    auto builder = makeUnique<IBuilder>(createInferBuilder(logger));
+
+    auto engine
+        = createNetworkWithGroupNormalization(builder, logger, group, channel, Dims4{batch, channel, height, width});
     EXPECT_NE(engine, nullptr);
 
     // Create execution context
