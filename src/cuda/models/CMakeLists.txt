@@ -17,7 +17,7 @@ foreach(MODEL_ITER ${MODEL_LISTS})
 endforeach(MODEL_ITER)
 
 # Add common
-add_subdirectory(common)
+# add_subdirectory(common)
 include_directories(.)
 
 set_source_files_properties(${MODEL_CU_SOURCES} PROPERTIES COMPILE_FLAGS "${GENCODES} ${ENABLED_SMS}")
@@ -38,8 +38,10 @@ target_link_libraries(${SHARED_TARGET} PUBLIC
     ${NVINFER_LIB}
     ${NVINFER_PLUGIN_LIB}
     # ${MYELIN64_1_LIB}
-    CUDA::cudart
+    # CUDA::cudart
     # CUDA::nvrtc
     ${CUDNN_LIB}
+    tensorrt_common_headers
+    tensorrt_common
 )
 

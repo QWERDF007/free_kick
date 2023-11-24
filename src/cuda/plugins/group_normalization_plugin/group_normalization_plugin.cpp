@@ -1,7 +1,7 @@
 #include "group_normalization_plugin.h"
 
-#include "common/dimsHelpers.h"
-#include "common/serialize.hpp"
+#include "dimsHelpers.h"
+#include "serialize.hpp"
 
 using namespace nvinfer1;
 using nvinfer1::plugin::GroupNormalizationPlugin;

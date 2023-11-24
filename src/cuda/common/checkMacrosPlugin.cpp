@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-#include "common/checkMacrosPlugin.h"
+#include "checkMacrosPlugin.h"
 
-#include "common/vfcCommon.h"
+#include "vfcCommon.h"
 
 #include <cublas_v2.h>
 #include <cuda_runtime.h>

@@ -17,7 +17,7 @@
 #ifndef TRT_PLUGIN_H
 #define TRT_PLUGIN_H
 #include "NvInferPlugin.h"
-#include "common/checkMacrosPlugin.h"
+#include "checkMacrosPlugin.h"
 
 #include <cuda_runtime.h>
 

@@ -22,7 +22,6 @@
 #include <mutex>
 #include <sstream>
 
-
 #ifdef _MSC_VER
 #    define FN_NAME __FUNCTION__
 #else

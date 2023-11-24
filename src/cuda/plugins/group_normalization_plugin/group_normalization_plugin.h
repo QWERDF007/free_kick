@@ -1,5 +1,5 @@
 #pragma once
-#include "common/plugin.h"
+#include "plugin.h"
 
 #include <cudnn.h>
 
