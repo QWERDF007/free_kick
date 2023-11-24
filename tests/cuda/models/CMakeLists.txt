@@ -1,7 +1,9 @@
+set(TARGET_NAME tensorrt_models_test)
+
 file(GLOB SRCS *.cpp)
 
 
-add_executable(tensorrt_model_test
+add_executable(${TARGET_NAME}
     ${SRCS}
 )
 
@@ -11,7 +13,7 @@ include_directories(
 )
 
 
-target_link_libraries(tensorrt_model_test 
+target_link_libraries(${TARGET_NAME} 
 PUBLIC
     GTest::gtest_main
     GTest::gmock

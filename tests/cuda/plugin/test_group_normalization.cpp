@@ -1,12 +1,11 @@
 #include "../../values_test.h"
 #include "../utility.h"
-#include "common/logging.h"
-#include "common/plugin.h"
 #include "group_normalization_plugin/group_normalization_plugin.h"
+#include "logging.h"
+#include "plugin.h"
 
 #include <iostream>
 #include <tuple>
-
 
 #define LOG_LEVEL ILogger::Severity::kERROR
 
