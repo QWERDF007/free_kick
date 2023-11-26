@@ -1,0 +1,5 @@
+set(MKL_VERSION "2024.0.0")
+set(MKL_HOME "E:/DevLib/mkl/mkl")
+set(MKL_LIBRARY_DIR "${MKL_HOME}/lib")
+set(MKL_INCLUDE_DIRS "${MKL_HOME}/include")
+set(MKL_BIN_DIR "${MKL_HOME}/bin")

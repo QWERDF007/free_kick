@@ -25,6 +25,8 @@ include(ConfigCompiler)
 include(ConfigCUDA)
 include(ConfigTensorRT)
 include(ConfigOpenCV)
+include(ConfigFaiss)
+include(ConfigMKL)
 
 if(BUILD_PYTHON)
     include(ConfigPython)
