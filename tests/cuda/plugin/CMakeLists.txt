@@ -42,5 +42,6 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy
         ${TensorRT_BINS}
         "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/"
+        COMMENT "Copying ${TensorRT_BINS} to ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/"
     )
 endif()

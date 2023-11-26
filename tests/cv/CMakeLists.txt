@@ -27,6 +27,7 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy
         "${OPENCV_WORLD_LIB}$<$<CONFIG:Debug>:d>.dll"
         "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/"
+        COMMENT "Copying ${OPENCV_WORLD_LIB}$<$<CONFIG:Debug>:d>.dll to ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/"
     )
 endif()
 
