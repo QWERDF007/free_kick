@@ -1,2 +1,5 @@
 add_subdirectory(stream)
 add_subdirectory(misc)
+if(Faiss_LIBS)
+    add_subdirectory(faiss_sample)
+endif()
