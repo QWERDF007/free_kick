@@ -1,6 +1,7 @@
 [submodule "3rdparty/googletest"]
 	path = 3rdparty/googletest
 	url = https://github.com/google/googletest.git
+	branch = main
 [submodule "3rdparty/pybind11"]
 	path = 3rdparty/pybind11
 	url = https://github.com/pybind/pybind11.git
@@ -8,4 +9,8 @@
 [submodule "3rdparty/benchmark"]
 	path = 3rdparty/benchmark
 	url = https://github.com/google/benchmark.git
+	branch = main
+[submodule "3rdparty/folly"]
+	path = 3rdparty/folly
+	url = https://github.com/facebook/folly.git
 	branch = main
