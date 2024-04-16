@@ -38,3 +38,5 @@ bin/
 *.wts
 *.pt
 *.pth
+
+CMakeLists.txt.user

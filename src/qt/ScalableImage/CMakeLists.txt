@@ -1,0 +1,50 @@
+
+set(PROJECT_NAME ScalableImage)
+set(URI ${PROJECT_NAME})
+project(${PROJECT_NAME} VERSION 0.1 LANGUAGES CXX)
+
+# 获取所有源文件的相对路径
+file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
+
+# 获取所有头文件的相对路径
+file(GLOB_RECURSE HEADERS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.h *.hpp)
+
+# 获取所有QML文件的相对路径
+file(GLOB_RECURSE QML_SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.qml)
+# 将 qml 文件组织到一起
+source_group("QML Files" FILES ${QML_SOURCES})
+
+qt_add_executable(${PROJECT_NAME}
+    ${SOURCES}
+    ${HEADERS}
+)
+
+qt_add_qml_module(${PROJECT_NAME}
+    URI ${URI}
+    VERSION 1.0
+    QML_FILES ${QML_SOURCES}
+)
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    MACOSX_BUNDLE_GUI_IDENTIFIER my.example.com
+    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+    MACOSX_BUNDLE TRUE
+    WIN32_EXECUTABLE TRUE
+)
+
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE Qt6::Quick
+)
+
+# 如果编译模式是Debug或RelWithDebInfo，则添加预处理定义QT_QML_DEBUG。用于开启Qt Quick调试功能
+target_compile_definitions(${PROJECT_NAME}
+PRIVATE
+    $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:QT_QML_DEBUG>
+)
+
+install(TARGETS ${PROJECT_NAME}
+    BUNDLE DESTINATION .
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)

@@ -27,6 +27,7 @@ include(ConfigTensorRT)
 include(ConfigOpenCV)
 include(ConfigFaiss)
 include(ConfigMKL)
+include(ConfigQT)
 
 if(BUILD_PYTHON)
     include(ConfigPython)
