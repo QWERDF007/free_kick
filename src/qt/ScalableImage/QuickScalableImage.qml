@@ -163,6 +163,21 @@ Item {
                 return dist < radius
             }
 
+            function getItemsUnderMouse(x, y) {
+                var items = []
+                for (var i = 0; i < imagePaintedRegion.children.length; ++i) {
+                    var child = imagePaintedRegion.children[i]
+                    if (child instanceof Rectangle)  {
+                        // && child.visible && child.containsPoint(x, y)
+                        console.log("getItemsUnderMouse", child, "x, y", x, y, child.containsPoint(x, y))
+                        if (child.visible && child.containsPoint(x, y)) {
+                            items.push(child)
+                        }
+                    }
+                }
+                return items
+            }
+
             Repeater {
                 id: regions
                 model: rois
@@ -230,6 +245,7 @@ Item {
 
                         onPressed: function(mouse) {
                             console.log("roi onPressed roi index", index, model.index, mouse.x, mouse.y)
+                            imagePaintedRegion.childAt()
                             ism.select(rois.index(model.index, 0), ItemSelectionModel.Select | ItemSelectionModel.Current)
                         }
 
