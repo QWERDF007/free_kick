@@ -1,10 +1,14 @@
-project(free_kick_utils_benchmark LANGUAGES CXX)
+set(PROJECT_NAME free_kick_utils_benchmark)
 
-add_executable(free_kick_utils_benchmark 
-    main.cpp 
+project(${PROJECT_NAME} LANGUAGES CXX)
+
+file(GLOB SRCS *.cpp)
+
+add_executable(${PROJECT_NAME} 
+    ${SRCS}
 )
 
-target_link_libraries(free_kick_utils_benchmark
+target_link_libraries(${PROJECT_NAME}
 PRIVATE
     benchmark::benchmark
 )
