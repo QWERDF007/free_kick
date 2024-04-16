@@ -1,1 +1,2 @@
 add_subdirectory(ScalableImage)
+add_subdirectory(qstr)
