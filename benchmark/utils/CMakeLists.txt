@@ -1,14 +1,16 @@
-set(PROJECT_NAME free_kick_utils_benchmark)
+set(TARGET_NAME free_kick_utils_benchmark)
 
-project(${PROJECT_NAME} LANGUAGES CXX)
+project(${TARGET_NAME} LANGUAGES CXX)
 
-file(GLOB SRCS *.cpp)
+file(GLOB SOURCES *.cpp)
+file(GLOB HEADERS *.h *.hpp)
 
-add_executable(${PROJECT_NAME} 
-    ${SRCS}
+add_executable(${TARGET_NAME} 
+    ${SOURCES}
+    ${HEADERS}
 )
 
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(${TARGET_NAME}
 PRIVATE
     benchmark::benchmark
 )
