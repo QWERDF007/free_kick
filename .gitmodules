@@ -10,7 +10,3 @@
 	path = 3rdparty/benchmark
 	url = https://github.com/google/benchmark.git
 	branch = main
-[submodule "3rdparty/folly"]
-	path = 3rdparty/folly
-	url = https://github.com/facebook/folly.git
-	branch = main
