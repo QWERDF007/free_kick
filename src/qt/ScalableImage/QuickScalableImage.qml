@@ -47,6 +47,7 @@ Item {
         drag.axis: Drag.XAndYAxis
         hoverEnabled: true
         acceptedButtons: Qt.AllButtons
+        property bool moved: false
 
         onPressed: function (mouse) {
             if (imagePaintedRegion.selection.hasSelection) {
@@ -64,6 +65,7 @@ Item {
                 setImageDragEnable(true)
                 setCursorShape(Qt.ClosedHandCursor)
             }
+            moved = false
         }
 
         onReleased: function (mouse) {
@@ -77,12 +79,19 @@ Item {
             } else if (mouse.button === Qt.LeftButton) {
                 scalableImage.addRect(mouse)
             }
+            if (!moved) {
+                var pos = mapToItem(imagePaintedRegion, mouse.x, mouse.y)
+                imagePaintedRegion.selectOneItem(pos)
+            }
+
+            moved = false
         }
 
         onPositionChanged: function (mouse) {
             if (scalableImage.drawing) {
                 scalableImage.updateDrawingRectByMouse(mouse)
             }
+            moved = true
         }
 
         onWheel: function (wheel) {

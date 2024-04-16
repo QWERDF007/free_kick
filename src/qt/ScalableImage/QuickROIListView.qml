@@ -114,16 +114,23 @@ Item {
                 drag.maximumX: imagePaintedRegion.width - roi.width
                 drag.minimumY: 0
                 drag.maximumY: imagePaintedRegion.height - roi.height
+                property bool moved: false
 
 
                 onPressed: function(mouse) {
-
+                    if (!roi.selected) {
+                        mouse.accepted = false
+                    }
+                    moved = false
                 }
 
                 onReleased: function(mouse) {
                     console.log("onReleased")
-                    var pos = mapToItem(imagePaintedRegion, mouse.x, mouse.y)
-                    imagePaintedRegion.selectOneItem(pos)
+                    if (!moved) {
+                        var pos = mapToItem(imagePaintedRegion, mouse.x, mouse.y)
+                        imagePaintedRegion.selectOneItem(pos)
+                    }
+                    moved = false
                 }
 
                 onPositionChanged: function(mouse) {
@@ -141,6 +148,7 @@ Item {
                             setCursorShape(Qt.ArrowCursor)
                         }
                     }
+                    moved = true
                 }
             }
 
