@@ -49,8 +49,8 @@ Item {
         acceptedButtons: Qt.AllButtons
 
         onPressed: function (mouse) {
-            if (ism.hasSelection) {
-                ism.clearSelection()
+            if (imagePaintedRegion.selection.hasSelection) {
+                imagePaintedRegion.selection.clearSelection()
             }
             scalableImage.forceActiveFocus()
             if (mouse.button === Qt.LeftButton) {
@@ -110,15 +110,7 @@ Item {
     }
 
 
-    ListModel {
-        id: rois
-        ListElement {x: 100; y: 20; width: 200; height: 105; color: "yellow"; label: "类别2"; visible: true; selected: false}
-        ListElement {x: 50; y: 200; width: 120; height: 60; color: "red"; label: "类别2"; visible: true; selected: false}
-    }
-    ItemSelectionModel {
-        id: ism
-        model: rois
-    }
+
 
     Image {
         id: _image
@@ -149,127 +141,179 @@ Item {
         //            opacity: 0.1
         //            border.color: "red"
         //            border.width: 1
-        Item {
+
+        // Item {
+        //     id: imagePaintedRegion
+        //     x: _image.xOffset
+        //     y: _image.yOffset
+        //     width: _image.paintedWidth
+        //     height: _image.paintedHeight
+
+        //     ListModel {
+        //         id: rois
+        //         ListElement {x: 100; y: 20; width: 200; height: 105; color: "yellow"; label: "类别2"; visible: true; selected: false}
+        //         ListElement {x: 50; y: 200; width: 120; height: 60; color: "red"; label: "类别2"; visible: true; selected: false}
+        //     }
+        //     ItemSelectionModel {
+        //         id: ism
+        //         model: rois
+        //     }
+
+        //     function isPointNear(px, py, cx, cy, radius) {
+        //         var dx = px - cx
+        //         var dy = py - cy
+        //         var dist = Math.sqrt(dx * dx + dy * dy)
+        //         return dist < radius
+        //     }
+
+        //     function getItemsUnderMouse(pos) {
+        //         var items = []
+        //         for (var i = 0; i < imagePaintedRegion.children.length; ++i) {
+        //             var child = imagePaintedRegion.children[i]
+        //             if (child instanceof Rectangle)  {
+        //                 var posOnChild = mapToItem(child, pos)
+        //                 if (child.visible && child.contains(posOnChild)) {
+        //                     items.push(child)
+        //                 }
+        //             }
+        //         }
+        //         return items
+        //     }
+
+        //     function selectOneItem(pos) {
+        //         var items = imagePaintedRegion.getItemsUnderMouse(pos)
+        //         if (items.length > 1) {
+        //             var tempIndex = -1
+        //             for (var i = 0; i < items.length; ++i) {
+        //                 if (regions.highlightIndex === items[i].index) {
+        //                     tempIndex = i
+        //                 }
+        //             }
+        //             --tempIndex
+        //             regions.highlightIndex = tempIndex < 0 ? items[items.length - 1].index : items[tempIndex].index
+        //         } else {
+        //             regions.highlightIndex = model.index
+        //         }
+        //         ism.select(rois.index(regions.highlightIndex, 0), ItemSelectionModel.Select | ItemSelectionModel.Current)
+        //     }
+
+
+
+        //     Repeater {
+        //         id: regions
+        //         model: rois
+        //         property int highlightIndex: -1
+        //         delegate: Rectangle {
+        //             id: roi
+        //             x: model.x
+        //             y: model.y
+        //             width: model.width
+        //             height: model.height
+        //             color: model.color
+        //             property real originalOpacity: 0.3
+        //             property bool selected: ism.isRowSelected(model.index)
+        //             property int index: model.index
+        //             Component.onCompleted: {
+        //                 console.log("roi.parent", roi.parent)
+        //             }
+
+        //             Connections{
+        //                 target: ism
+        //                 function onSelectionChanged (selected, deselected) {
+        //                     roi.selected = ism.isRowSelected(model.index)
+        //                 }
+        //             }
+
+        //             opacity: {
+        //                 if (roiMouseArea.containsMouse || roi.selected) {
+        //                     return originalOpacity * 2
+        //                 }
+        //                 return originalOpacity
+        //             }
+
+        //             onXChanged: {
+        //                 if (roiMouseArea.pressed && roi.selected) {
+        //                     model.x = Math.min(Math.max(0, x), imagePaintedRegion.width)
+        //                 }
+        //             }
+
+        //             onYChanged: {
+        //                 if (roiMouseArea.pressed && roi.selected) {
+        //                     model.y = Math.min(Math.max(0, y), imagePaintedRegion.height)
+        //                 }
+        //             }
+
+        //             onWidthChanged: {
+        //                 if (roiMouseArea.pressed && roi.selected) {
+        //                     model.width = Math.min(roi.width, imagePaintedRegion.width)
+        //                 }
+        //             }
+
+        //             onHeightChanged: {
+        //                 if (roiMouseArea.pressed && roi.selected) {
+        //                     model.height = Math.min(roi.height, imagePaintedRegion.height)
+        //                 }
+        //             }
+
+        //             MouseArea {
+        //                 id: roiMouseArea
+        //                 anchors.fill: parent
+        //                 anchors.leftMargin: -5
+        //                 anchors.rightMargin: -5
+        //                 anchors.topMargin: -5
+        //                 anchors.bottomMargin: -5
+        //                 hoverEnabled: true
+        //                 drag.target: roiMouseArea.pressed ? roi : null
+        //                 drag.axis: Drag.XAndYAxis
+        //                 drag.minimumX: 0
+        //                 drag.maximumX: imagePaintedRegion.width - roi.width
+        //                 drag.minimumY: 0
+        //                 drag.maximumY: imagePaintedRegion.height - roi.height
+
+        //                 onPressed: function(mouse) {
+        //                     var pos = mapToItem(imagePaintedRegion, mouse.x, mouse.y)
+        //                     imagePaintedRegion.selectOneItem(pos)
+        //                 }
+
+        //                 onPositionChanged: function(mouse) {
+        //                     var pt = mapToItem(roi, mouse.x, mouse.y)
+        //                     //                            console.log("roi onPositionChanged", mouse.x, mouse.y, pt.x, pt.y, isNearCorner)
+        //                     if (imagePaintedRegion.isPointNear(pt.x, pt.y, 0, 0, 10)) {
+        //                         setCursorShape(Qt.SizeFDiagCursor)
+        //                     } else if (imagePaintedRegion.isPointNear(pt.x, pt.y, imagePaintedRegion.width, imagePaintedRegion.height, 10)) {
+        //                         setCursorShape(Qt.SizeFDiagCursor)
+        //                     } else {
+        //                         setCursorShape(Qt.ArrowCursor)
+        //                     }
+        //                 }
+        //             }
+
+        //             Keys.onDeletePressed: {
+
+        //             }
+
+        //             function setCursorShape(cursorShape) {
+        //                 if (roiMouseArea.cursorShape !== cursorShape) {
+        //                     roiMouseArea.cursorShape = cursorShape
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+
+        QuickROIListView {
             id: imagePaintedRegion
             x: _image.xOffset
             y: _image.yOffset
             width: _image.paintedWidth
             height: _image.paintedHeight
-
-            function isPointNear(px, py, cx, cy, radius) {
-                var dx = px - cx
-                var dy = py - cy
-                var dist = Math.sqrt(dx * dx + dy * dy)
-                return dist < radius
-            }
-
-            function getItemsUnderMouse(x, y) {
-                var items = []
-                for (var i = 0; i < imagePaintedRegion.children.length; ++i) {
-                    var child = imagePaintedRegion.children[i]
-                    if (child instanceof Rectangle)  {
-                        // && child.visible && child.containsPoint(x, y)
-                        console.log("getItemsUnderMouse", child, "x, y", x, y, child.containsPoint(x, y))
-                        if (child.visible && child.containsPoint(x, y)) {
-                            items.push(child)
-                        }
-                    }
-                }
-                return items
-            }
-
-            Repeater {
-                id: regions
-                model: rois
-                delegate: Rectangle {
-                    id: roi
-                    x: model.x
-                    y: model.y
-                    width: model.width
-                    height: model.height
-                    color: model.color
-                    property real originalOpacity: 0.3
-                    property bool selected: ism.isRowSelected(model.index)
-                    Connections{
-                        target: ism
-                        function onSelectionChanged (selected, deselected) {
-                            roi.selected = ism.isRowSelected(model.index)
-                        }
-                    }
-
-                    opacity: {
-                        if (roiMouseArea.containsMouse || roi.selected) {
-                            return originalOpacity * 2
-                        }
-                        return originalOpacity
-                    }
-
-                    onXChanged: {
-                        if (roiMouseArea.pressed && roi.selected) {
-                            model.x = Math.min(Math.max(0, x), imagePaintedRegion.width)
-                        }
-                    }
-
-                    onYChanged: {
-                        if (roiMouseArea.pressed && roi.selected) {
-                            model.y = Math.min(Math.max(0, y), imagePaintedRegion.height)
-                        }
-                    }
-
-                    onWidthChanged: {
-                        if (roiMouseArea.pressed && roi.selected) {
-                            model.width = Math.min(roi.width, imagePaintedRegion.width)
-                        }
-                    }
-
-                    onHeightChanged: {
-                        if (roiMouseArea.pressed && roi.selected) {
-                            model.height = Math.min(roi.height, imagePaintedRegion.height)
-                        }
-                    }
-
-                    MouseArea {
-                        id: roiMouseArea
-                        anchors.fill: parent
-                        anchors.leftMargin: -5
-                        anchors.rightMargin: -5
-                        anchors.topMargin: -5
-                        anchors.bottomMargin: -5
-                        hoverEnabled: true
-                        drag.target: roiMouseArea.pressed ? roi : null
-                        drag.axis: Drag.XAndYAxis
-                        drag.minimumX: 0
-                        drag.maximumX: imagePaintedRegion.width - roi.width
-                        drag.minimumY: 0
-                        drag.maximumY: imagePaintedRegion.height - roi.height
-
-                        onPressed: function(mouse) {
-                            console.log("roi onPressed roi index", index, model.index, mouse.x, mouse.y)
-                            imagePaintedRegion.childAt()
-                            ism.select(rois.index(model.index, 0), ItemSelectionModel.Select | ItemSelectionModel.Current)
-                        }
-
-                        onPositionChanged: function(mouse) {
-                            var pt = mapToItem(roi, mouse.x, mouse.y)
-                            //                            console.log("roi onPositionChanged", mouse.x, mouse.y, pt.x, pt.y, isNearCorner)
-                            if (imagePaintedRegion.isPointNear(pt.x, pt.y, 0, 0, 10)) {
-                                setCursorShape(Qt.SizeFDiagCursor)
-                            } else if (imagePaintedRegion.isPointNear(pt.x, pt.y, imagePaintedRegion.width, imagePaintedRegion.height, 10)) {
-                                setCursorShape(Qt.SizeFDiagCursor)
-                            } else {
-                                setCursorShape(Qt.ArrowCursor)
-                            }
-                        }
-                    }
-
-                    function setCursorShape(cursorShape) {
-                        if (roiMouseArea.cursorShape !== cursorShape) {
-                            roiMouseArea.cursorShape = cursorShape
-                        }
-                    }
-                }
+            rois:  ListModel {
+                id: rois
+                ListElement {x: 100; y: 20; width: 200; height: 105; color: "yellow"; label: "类别2"; visible: true; selected: false}
+                ListElement {x: 50; y: 200; width: 120; height: 60; color: "red"; label: "类别2"; visible: true; selected: false}
             }
         }
+
     }
 
     onWidthChanged: {
