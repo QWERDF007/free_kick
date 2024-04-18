@@ -9,8 +9,6 @@ Item {
     clip: true
     width: 200
     height: 200
-    // implicitHeight: _image.implicitHeight // 不确定绑定Image的隐式宽高有没有问题
-    // implicitWidth: _image.implicitWidth
 
     property alias image: _image
     property alias status: _image.status
@@ -18,7 +16,7 @@ Item {
     property alias sourceSize: _image.sourceSize
     property bool imageDragEnable: false
     property real stepSize: {
-        if (_image.scale < 2) {
+        if (_image.scale < 2 || _image.paintedWidth * _image.scale < scalableImage.width || _image.paintedHeight * _image.scale < scalableImage.height) {
             return 0.1
         } else if (_image.scale < 10) {
             return 1
@@ -32,7 +30,7 @@ Item {
     property var scaledImagePos: mapFromItem(_image, 0, 0)
     property bool isFitInView: true
     property real imageSourceScale: {
-        if (_image.source !== "" && _image.status === _image.Ready) {
+        if (_image.source !== Qt.url("") && _image.status === _image.Ready) {
             return Math.min(scalableImage.height / _image.sourceSize.height, scalableImage.width / _image.sourceSize.width)
         }
         return 1.0
@@ -41,10 +39,7 @@ Item {
     property point startPoint
     property color drawingColor: "red"
     property bool drawing: false
-
-    Component.onCompleted: {
-        _image.source = "file:///H:/Datasets/性感美女/raw/1691766509-cc387fc3be7ab7d.jpg"
-    }
+    property var roiItem: roi_rect
 
     MouseArea {
         id: mouseArea
@@ -61,14 +56,14 @@ Item {
                     setImageDragEnable(true)
                     setCursorShape(Qt.ClosedHandCursor)
                 } else {
-                    roi_rect.visible = true
-                    roi_rect.selected = false
+//                    roiItem.visible = true
+                    roiItem.selected = false
                     scalableImage.startDrawingRect(mouse)
                 }
             } else if (mouse.button === Qt.MiddleButton) {
                 setImageDragEnable(true)
                 setCursorShape(Qt.ClosedHandCursor)
-                roi_rect.setCursorShape(Qt.ClosedHandCursor)
+                roiItem.setCursorShape(Qt.ClosedHandCursor)
             }
         }
 
@@ -79,22 +74,23 @@ Item {
                     setCursorShape(Qt.OpenHandCursor)
                 } else {
                     setCursorShape(Qt.ArrowCursor)
-                    if (roi_rect.selected) {
-                        roi_rect.setCursorShape(Qt.SizeAllCursor)
+                    if (roiItem.selected) {
+                        roiItem.setCursorShape(Qt.SizeAllCursor)
                     } else {
-                        roi_rect.setCursorShape(Qt.ArrowCursor)
+                        roiItem.setCursorShape(Qt.ArrowCursor)
                     }
                 }
             } else if (mouse.button === Qt.LeftButton) {
-                scalableImage.updateRect(mouse)
-                scalableImage.drawing = false
+                if (scalableImage.drawing) {
+                    scalableImage.updateRectROI(mouse)
+                    scalableImage.drawing = false
+                }
             }
         }
 
         onPositionChanged: function (mouse) {
             if (scalableImage.drawing) {
-                scalableImage.updateRect(mouse)
-                scalableImage.updateDrawingRectByMouse(mouse)
+                scalableImage.updateDrawingRect(mouse)
             }
         }
 
@@ -148,251 +144,10 @@ Item {
             console.log("scale", scale)
         }
 
-        Rectangle {
+        QuickEditableRect {
             id: roi_rect
-            property bool selected: false
-            property real _opacity: 0.3
-            property real _m: 10 / parent.scale
-            property int minimalSize: 5
-            opacity: selected ? _opacity * 2 : _opacity
-            // visible: false
-            border.color: "red"
-            border.width: selected ? 2 : 1
-            color: "transparent"
-            // color: "red"
-            MouseArea {
-                id: roi_rect_mouse
-                property bool dragEnable: false
-                property int dragType: -1
-                anchors.fill: parent
-                anchors.margins: -10
-                acceptedButtons: Qt.AllButtons
-                hoverEnabled: true
-                drag.target: dragEnable ? roi_rect : null
-                drag.minimumX: 0
-                drag.maximumX: _image.width - roi_rect.width
-                drag.minimumY: 0
-                drag.maximumY: _image.height - roi_rect.height
-                onPressed: function(mouse) {
-                    if (mouse.button === Qt.LeftButton) {
-                        roi_rect.selected = true
-                        var pt = mapToItem(roi_rect, mouse.x, mouse.y)
-                        if (roi_rect.isPointNearPoint(pt.x, pt.y, 0, 0, roi_rect._m)) { // top left
-                            roi_rect.setCursorShape(Qt.SizeFDiagCursor)
-                        } else if (roi_rect.isPointNearPoint(pt.x, pt.y, roi_rect.width, roi_rect.height, roi_rect._m)) { // bottom right
-                            roi_rect.setCursorShape(Qt.SizeFDiagCursor)
-                        } else if (roi_rect.isPointNearPoint(pt.x, pt.y, 0, roi_rect.height, roi_rect._m)) { // bottom left
-                            roi_rect.setCursorShape(Qt.SizeBDiagCursor)
-                        } else if (roi_rect.isPointNearPoint(pt.x, pt.y, roi_rect.width, 0, roi_rect._m)) { // top right
-                            roi_rect.setCursorShape(Qt.SizeBDiagCursor)
-                        } else if (roi_rect.isPointNearLine(pt.x, pt.y, 0, 0, 0, roi_rect.height, roi_rect._m)) { // left edge
-                            roi_rect.setCursorShape(Qt.SizeHorCursor)
-                        } else if (roi_rect.isPointNearLine(pt.x, pt.y, roi_rect.width, 0, roi_rect.width, roi_rect.height, roi_rect._m)) { // right edge
-                            roi_rect.setCursorShape(Qt.SizeHorCursor)
-                        } else if (roi_rect.isPointNearLine(pt.x, pt.y, 0, 0, roi_rect.width, 0, roi_rect._m)) { // top edge
-                            roi_rect.setCursorShape(Qt.SizeVerCursor)
-                        } else if (roi_rect.isPointNearLine(pt.x, pt.y, 0, roi_rect.height, roi_rect.width, roi_rect.height, roi_rect._m)) { // top edge
-                            roi_rect.setCursorShape(Qt.SizeVerCursor)
-                        } else {
-                            roi_rect.setCursorShape(Qt.SizeAllCursor)
-                            dragEnable = true
-                        }
-                    } else if (mouse.button === Qt.MiddleButton) {
-                        mouse.accepted = false
-                    }
-                }
-
-                onReleased: function(mouse) {
-                    if (mouse.button === Qt.LeftButton) {
-                        dragEnable = false
-                    }
-                    dragType = -1
-                }
-
-
-
-                onPositionChanged: function(mouse) {
-                    // console.log("onPositionChanged", mouse.x, mouse.y, dragType)
-                    var pt = mapToItem(roi_rect, mouse.x, mouse.y)
-                    var pos = mapToItem(_image, mouse.x, mouse.y)
-                    if (dragEnable) {
-
-                    } else if (roi_rect.selected) {
-                        if (dragType === 0) { // top left
-                            roi_rect.updateByTopLeft(pos)
-                        } else if (dragType === 1) { // bottom right
-                            roi_rect.updateByBottomRight(pos)
-                        } else if (dragType === 2) { // bottom left
-                            roi_rect.updateByBottomLeft(pos)
-                        } else if (dragType === 3) { // top right
-                            roi_rect.updateByTopRight(pos)
-                        } else if (dragType === 4) { // left edge
-                            roi_rect.updateByLeft(pos)
-                        } else if (dragType === 5) { // right edge
-                            roi_rect.updateByRight(pos)
-                        } else if (dragType === 6) { // top edge
-                            roi_rect.updateByTop(pos)
-                        } else if (dragType === 7) { // bottom edge
-                            roi_rect.updateByBottom(pos)
-                        } else if (roi_rect.isPointNearPoint(pt.x, pt.y, 0, 0, roi_rect._m)) { // top left
-                            roi_rect.setCursorShape(Qt.SizeFDiagCursor)
-                            if (mouse.buttons & Qt.LeftButton) {
-                                dragType = 0
-                                roi_rect.updateByTopLeft(pos)
-                            }
-                        } else if (roi_rect.isPointNearPoint(pt.x, pt.y, roi_rect.width, roi_rect.height, roi_rect._m)) { // bottom right
-                            roi_rect.setCursorShape(Qt.SizeFDiagCursor)
-                            if (mouse.buttons & Qt.LeftButton) {
-                                dragType = 1
-                                roi_rect.updateByBottomRight(pos)
-                            }
-                        } else if (roi_rect.isPointNearPoint(pt.x, pt.y, 0, roi_rect.height, roi_rect._m)) { // bottom left
-                            roi_rect.setCursorShape(Qt.SizeBDiagCursor)
-                            if (mouse.buttons & Qt.LeftButton) {
-                                dragType = 2
-                                roi_rect.updateByBottomLeft(pos)
-                            }
-                        } else if (roi_rect.isPointNearPoint(pt.x, pt.y, roi_rect.width, 0, roi_rect._m)) { // top right
-                            roi_rect.setCursorShape(Qt.SizeBDiagCursor)
-                            if (mouse.buttons & Qt.LeftButton) {
-                                dragType = 3
-                                roi_rect.updateByTopRight(pos)
-                            }
-                        } else if (roi_rect.isPointNearLine(pt.x, pt.y, 0, 0, 0, roi_rect.height, roi_rect._m) && pt.y > 0 && pt.y < roi_rect.height) { // left edge
-                            roi_rect.setCursorShape(Qt.SizeHorCursor)
-                            if (mouse.buttons & Qt.LeftButton) {
-                                dragType = 4
-                                roi_rect.updateByLeft(pos)
-                            }
-                        } else if (roi_rect.isPointNearLine(pt.x, pt.y, roi_rect.width, 0, roi_rect.width, roi_rect.height, roi_rect._m) && pt.y > 0 && pt.y < roi_rect.height) { // right edge
-                            roi_rect.setCursorShape(Qt.SizeHorCursor)
-                            if (mouse.buttons & Qt.LeftButton) {
-                                dragType = 5
-                                roi_rect.updateByRight(pos)
-                            }
-                        } else if (roi_rect.isPointNearLine(pt.x, pt.y, 0, 0, roi_rect.width, 0, roi_rect._m) && pt.x > 0 && pt.x < roi_rect.width) { // top edge
-                            roi_rect.setCursorShape(Qt.SizeVerCursor)
-                            if (mouse.buttons & Qt.LeftButton) {
-                                dragType = 6
-                                roi_rect.updateByTop(pos)
-                            }
-                        } else if (roi_rect.isPointNearLine(pt.x, pt.y, 0, roi_rect.height, roi_rect.width, roi_rect.height, roi_rect._m) && pt.x > 0 && pt.x < roi_rect.width) { // bottom edge
-                            roi_rect.setCursorShape(Qt.SizeVerCursor)
-                            if (mouse.buttons & Qt.LeftButton) {
-                                dragType = 7
-                                roi_rect.updateByBottom(pos)
-                            }
-                        } else {
-                            roi_rect.setCursorShape(Qt.SizeAllCursor)
-                        }
-                    } else {
-                        roi_rect.setCursorShape(Qt.ArrowCursor)
-                    }
-                }
-            }
-
-            function setCursorShape(cursorShape) {
-                if (roi_rect_mouse.cursorShape !== cursorShape) {
-                    roi_rect_mouse.cursorShape = cursorShape
-                }
-            }
-
-            function isPointNearPoint(px, py, cx, cy, radius) {
-                var dx = px - cx
-                var dy = py - cy
-                var dist = Math.sqrt(dx * dx + dy * dy)
-                return dist < radius
-            }
-
-            function isPointNearLine(px, py, x1, y1, x2, y2, dist) {
-                var distance = Math.abs((y2 - y1) * px - (x2 - x1) * py + x2 * y1 - y2 * x1) / Math.sqrt((y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1))
-                return distance < dist
-            }
-
-            function updateByTopLeft(pos) {
-                var top = pos.y
-                var left = pos.x
-                var right = roi_rect.x + roi_rect.width
-                var bottom = roi_rect.y + roi_rect.height
-                top = Math.min(top, bottom - roi_rect.minimalSize)
-                left = Math.min(left, right - roi_rect.minimalSize)
-                roi_rect.x = left
-                roi_rect.y = top
-                roi_rect.width = right - left
-                roi_rect.height = bottom - top
-            }
-
-            function updateByTopRight(pos) {
-                var top = pos.y
-                var left = roi_rect.x
-                var right = pos.x
-                var bottom = roi_rect.y + roi_rect.height
-                top = Math.min(top, bottom - roi_rect.minimalSize)
-                right = Math.max(right, left + roi_rect.minimalSize)
-                roi_rect.x = left
-                roi_rect.y = top
-                roi_rect.width = right - left
-                roi_rect.height = bottom - top
-            }
-
-            function updateByBottomLeft(pos) {
-                var top = roi_rect.y
-                var left = pos.x
-                var right = roi_rect.x + roi_rect.width
-                var bottom = pos.y
-                bottom = Math.max(bottom, top + roi_rect.minimalSize)
-                left = Math.min(left, right - roi_rect.minimalSize)
-                roi_rect.x = left
-                roi_rect.y = top
-                roi_rect.width = right - left
-                roi_rect.height = bottom - top
-            }
-
-            function updateByBottomRight(pos) {
-                var top = roi_rect.y
-                var left = roi_rect.x
-                var right = pos.x
-                var bottom = pos.y
-                bottom = Math.max(bottom, top + roi_rect.minimalSize)
-                right = Math.max(right, left + roi_rect.minimalSize)
-                roi_rect.x = left
-                roi_rect.y = top
-                roi_rect.width = right - left
-                roi_rect.height = bottom - top
-            }
-
-            function updateByTop(pos) {
-                var top = pos.y
-                var bottom = roi_rect.y + roi_rect.height
-                top = Math.min(top, bottom - roi_rect.minimalSize)
-                roi_rect.y = top
-                roi_rect.height = bottom - top
-            }
-
-            function updateByBottom(pos) {
-                var top = roi_rect.y
-                var bottom = pos.y
-                bottom = Math.max(bottom, top + roi_rect.minimalSize)
-                roi_rect.y = top
-                roi_rect.height = bottom - top
-            }
-
-            function updateByLeft(pos) {
-                var left = pos.x
-                var right = roi_rect.x + roi_rect.width
-                left = Math.min(left, right - roi_rect.minimalSize)
-                roi_rect.x = left
-                roi_rect.width = right - left
-            }
-
-            function updateByRight(pos) {
-                var left = roi_rect.x
-                var right = pos.x
-                right = Math.max(right, left + roi_rect.minimalSize)
-                roi_rect.x = left
-                roi_rect.width = right - left
-            }
         }
+
     }
 
     onWidthChanged: {
@@ -514,7 +269,7 @@ Item {
      * @brief 更新绘制的矩形, 结束绘制
      * @param mouse
      */
-    function updateDrawingRectByMouse(mouse) {
+    function updateDrawingRect(mouse) {
         drawingRect.width = Math.abs(mouse.x - scalableImage.startPoint.x)
         drawingRect.height = Math.abs(mouse.y - scalableImage.startPoint.y)
         drawingRect.x = Math.min(mouse.x, scalableImage.startPoint.x)
@@ -525,7 +280,7 @@ Item {
      * @brief 添加一个矩形, 矩形被限制在图像区域内
      * @param mouse
      */
-    function updateRect(mouse) {
+    function updateRectROI(mouse) {
         var pt1 = mapToItem(_image, scalableImage.startPoint)
         var pt2 = mapToItem(_image, mouse.x, mouse.y)
         var left = Math.min(pt1.x, pt2.x)
@@ -542,18 +297,13 @@ Item {
         var height = bottom - top
         if (width > 0 && height > 0) {
             // console.log("add one rect", x, y, width, height)
-            roi_rect.x = x
-            roi_rect.y = y
-            roi_rect.width = width
-            roi_rect.height = height
+            var data = [x, y, width, height]
+            roiItem.updateByData(data)
         }
     }
 
     function clearROI() {
-        roi_rect.x = 0
-        roi_rect.y = 0
-        roi_rect.width = 0
-        roi_rect.height = 0
-        roi_rect.visible = false
+        roiItem.clear()
+        roiItem.visible = false
     }
 }

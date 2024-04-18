@@ -8,7 +8,7 @@ Item {
 
     property alias rois: regions.model
     property alias selection: ism
-    property real _m: 20 / imagePaintedRegion.parent.scale
+    property real _m: 10 / imagePaintedRegion.parent.scale
 
     ItemSelectionModel {
         id: ism
