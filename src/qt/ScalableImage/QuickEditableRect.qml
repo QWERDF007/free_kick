@@ -6,7 +6,14 @@ Rectangle {
     property bool selected: false
     property real _m: Math.max(5, 10 / parent.scale) // 靠近顶点和边的距离阈值
     property int _ms: 5 // 矩形最小大小
-    property var roiData: []
+    property var roiData: [] // 矩形数据
+    property point startPoint // 绘制七点, 坐标系是 parent 上的
+
+    onRoiDataChanged: {
+        console.log("roiData", roiData)
+    }
+
+    color: "transparent"
     border.color: "red"
     border.width: selected ? Math.max(2, 2 / parent.scale) : Math.max(1, 1 / parent.scale)
 
@@ -17,14 +24,26 @@ Rectangle {
         property real bottom: editableRect.height
     }
 
-    color: "transparent"
-    // color: "red"
+    onXChanged: {
+        if (mouseArea.dragEnable) {
+            roiData = [editableRect.x, editableRect.y, editableRect.width, editableRect.height]
+        }
+    }
+
+    onYChanged: {
+        if (mouseArea.dragEnable) {
+            roiData = [editableRect.x, editableRect.y, editableRect.width, editableRect.height]
+        }
+    }
+
+
+
     MouseArea {
         id: mouseArea
         property bool dragEnable: false
         property int dragType: -1
         anchors.fill: parent
-        anchors.margins: -10 // 鼠标区域比矩形大好处理顶点和边的编辑
+        anchors.margins: editableRect.visible ? -10 : 0 // 鼠标区域比矩形大好处理顶点和边的编辑
         acceptedButtons: Qt.AllButtons
         hoverEnabled: true
         drag.target: dragEnable ? editableRect : null
@@ -185,90 +204,10 @@ Rectangle {
         return distance < dist
     }
 
-    function updateByTopLeft(pos) {
-        var top = pos.y
-        var left = pos.x
-        var right = editableRect.x + editableRect.width
-        var bottom = editableRect.y + editableRect.height
-        top = Math.max(0, Math.min(top, bottom - editableRect._ms))
-        left = Math.max(0, Math.min(left, right - editableRect._ms))
-        editableRect.x = left
-        editableRect.y = top
-        editableRect.width = right - left
-        editableRect.height = bottom - top
-    }
-
-    function updateByTopRight(pos) {
-        var top = pos.y
-        var left = editableRect.x
-        var right = pos.x
-        var bottom = editableRect.y + editableRect.height
-        top = Math.max(0, Math.min(top, bottom - editableRect._ms))
-        right = Math.min(Math.max(right, left + editableRect._ms), editableRect.parent.width)
-        editableRect.x = left
-        editableRect.y = top
-        editableRect.width = right - left
-        editableRect.height = bottom - top
-    }
-
-    function updateByBottomLeft(pos) {
-        var top = editableRect.y
-        var left = pos.x
-        var right = editableRect.x + editableRect.width
-        var bottom = pos.y
-        bottom = Math.min(Math.max(bottom, top + editableRect._ms), editableRect.parent.height)
-        left = Math.max(0, Math.min(left, right - editableRect._ms))
-        editableRect.x = left
-        editableRect.y = top
-        editableRect.width = right - left
-        editableRect.height = bottom - top
-    }
-
-    function updateByBottomRight(pos) {
-        var top = editableRect.y
-        var left = editableRect.x
-        var right = pos.x
-        var bottom = pos.y
-        bottom = Math.min(Math.max(bottom, top + editableRect._ms), editableRect.parent.height)
-        right = Math.min(Math.max(right, left + editableRect._ms), editableRect.parent.width)
-        editableRect.x = left
-        editableRect.y = top
-        editableRect.width = right - left
-        editableRect.height = bottom - top
-    }
-
-    function updateByTop(pos) {
-        var top = pos.y
-        var bottom = editableRect.y + editableRect.height
-        top = Math.max(0, Math.min(top, bottom - editableRect._ms))
-        editableRect.y = top
-        editableRect.height = bottom - top
-    }
-
-    function updateByBottom(pos) {
-        var top = editableRect.y
-        var bottom = pos.y
-        bottom = Math.min(Math.max(bottom, top + editableRect._ms), editableRect.parent.height)
-        editableRect.y = top
-        editableRect.height = bottom - top
-    }
-
-    function updateByLeft(pos) {
-        var left = pos.x
-        var right = editableRect.x + editableRect.width
-        left = Math.max(0, Math.min(left, right - editableRect._ms))
-        editableRect.x = left
-        editableRect.width = right - left
-    }
-
-    function updateByRight(pos) {
-        var left = editableRect.x
-        var right = pos.x
-        right = Math.min(Math.max(right, left + editableRect._ms), editableRect.parent.width)
-        editableRect.x = left
-        editableRect.width = right - left
-    }
-
+    /**
+     * @brief 更新数据
+     * @param data 矩形数据, xywh 格式
+     */
     function updateByData(data) {
         if (data.length < 4)
             return
@@ -276,13 +215,147 @@ Rectangle {
         editableRect.y = data[1]
         editableRect.width = data[2]
         editableRect.height = data[3]
+        editableRect.roiData = data
+        if (!editableRect.visible)
+            editableRect.visible = true
     }
 
+    /**
+     * @brief 拖拽矩形的左上顶点更新
+     * @param pos parent 坐标系的鼠标位置
+     */
+    function updateByTopLeft(pos) {
+        var top = pos.y
+        var left = pos.x
+        var right = editableRect.x + editableRect.width
+        var bottom = editableRect.y + editableRect.height
+        top = Math.max(0, Math.min(top, bottom - editableRect._ms))
+        left = Math.max(0, Math.min(left, right - editableRect._ms))
+        updateByData([left, top, right - left, bottom - top])
+    }
+
+    /**
+     * @brief 拖拽矩形的右上顶点更新
+     * @param pos parent 坐标系的鼠标位置
+     */
+    function updateByTopRight(pos) {
+        var top = pos.y
+        var left = editableRect.x
+        var right = pos.x
+        var bottom = editableRect.y + editableRect.height
+        top = Math.max(0, Math.min(top, bottom - editableRect._ms))
+        right = Math.min(Math.max(right, left + editableRect._ms), editableRect.parent.width)
+        updateByData([editableRect.x, top, right - left , bottom - top])
+    }
+
+    /**
+     * @brief 拖拽矩形的左下顶点更新
+     * @param pos parent 坐标系的鼠标位置
+     */
+    function updateByBottomLeft(pos) {
+        var top = editableRect.y
+        var left = pos.x
+        var right = editableRect.x + editableRect.width
+        var bottom = pos.y
+        bottom = Math.min(Math.max(bottom, top + editableRect._ms), editableRect.parent.height)
+        left = Math.max(0, Math.min(left, right - editableRect._ms))
+        updateByData([left, editableRect.y, right - left, bottom - top])
+    }
+
+    /**
+     * @brief 拖拽矩形的右下顶点更新
+     * @param pos parent 坐标系的鼠标位置
+     */
+    function updateByBottomRight(pos) {
+        var top = editableRect.y
+        var left = editableRect.x
+        var right = pos.x
+        var bottom = pos.y
+        bottom = Math.min(Math.max(bottom, top + editableRect._ms), editableRect.parent.height)
+        right = Math.min(Math.max(right, left + editableRect._ms), editableRect.parent.width)
+        updateByData([editableRect.x, editableRect.y, right - left, bottom - top])
+    }
+
+    /**
+     * @brief 拖拽矩形的上边更新
+     * @param pos parent 坐标系的鼠标位置
+     */
+    function updateByTop(pos) {
+        var top = pos.y
+        var bottom = editableRect.y + editableRect.height
+        top = Math.max(0, Math.min(top, bottom - editableRect._ms))
+        updateByData([editableRect.x, top, editableRect.width, bottom - top])
+    }
+
+    /**
+     * @brief 拖拽矩形的下边更新
+     * @param pos parent 坐标系的鼠标位置
+     */
+    function updateByBottom(pos) {
+        var top = editableRect.y
+        var bottom = pos.y
+        bottom = Math.min(Math.max(bottom, top + editableRect._ms), editableRect.parent.height)
+        updateByData([editableRect.x, editableRect.y, editableRect.width, bottom - top])
+    }
+
+    /**
+     * @brief 拖拽矩形的左边更新
+     * @param pos parent 坐标系的鼠标位置
+     */
+    function updateByLeft(pos) {
+        var left = pos.x
+        var right = editableRect.x + editableRect.width
+        left = Math.max(0, Math.min(left, right - editableRect._ms))
+        updateByData([left, editableRect.y, right - left, editableRect.height])
+    }
+
+    /**
+     * @brief 拖拽矩形的右边更新
+     * @param pos parent 坐标系的鼠标位置
+     */
+    function updateByRight(pos) {
+        var left = editableRect.x
+        var right = pos.x
+        right = Math.min(Math.max(right, left + editableRect._ms), editableRect.parent.width)
+        updateByData([editableRect.x, editableRect.y, right - left, editableRect.height])
+    }
+
+
+
+    /**
+     * @brief 重置矩形, 清除数据
+     */
     function clear() {
         editableRect.x = 0
         editableRect.y = 0
         editableRect.width = 0
         editableRect.height = 0
         editableRect.visible = false
+        editableRect.selected = false
+        editableRect.roiData = []
+    }
+
+    /**
+     * @brief 在 pos 处更新矩形
+     * @param pos 鼠标在 parent 坐标系的位置
+     */
+    function updateByPos(pos) {
+        var pt1 = editableRect.startPoint
+        var pt2 = pos
+        var left = Math.min(pt1.x, pt2.x)
+        left = Math.max(0, left)
+        var right = Math.max(pt1.x, pt2.x)
+        right = Math.min(right, editableRect.parent.width)
+        var top = Math.min(pt1.y, pt2.y)
+        top = Math.max(0, top)
+        var bottom = Math.max(pt1.y, pt2.y)
+        bottom = Math.min(bottom, editableRect.parent.height)
+        var x = left
+        var y = top
+        var width = right - left
+        var height = bottom - top
+        if (width > 0 && height > 0) {
+            editableRect.updateByData([x, y, width, height])
+        }
     }
 }

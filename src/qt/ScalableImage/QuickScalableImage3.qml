@@ -10,6 +10,8 @@ Item {
     width: 200
     height: 200
 
+    property var imageRect: []
+
     property alias image: _image
     property alias status: _image.status
     property alias source: _image.source
@@ -41,6 +43,12 @@ Item {
     property bool drawing: false
     property var roiItem: roi_rect
 
+    ToolTip {
+        id: tooltip
+        delay: 200
+        visible: mouseArea.containsMouse
+    }
+
     MouseArea {
         id: mouseArea
         anchors.fill: parent
@@ -56,9 +64,9 @@ Item {
                     setImageDragEnable(true)
                     setCursorShape(Qt.ClosedHandCursor)
                 } else {
-//                    roiItem.visible = true
                     roiItem.selected = false
-                    scalableImage.startDrawingRect(mouse)
+                    scalableImage.drawing = true
+                    roiItem.startPoint = mapToItem(_image, mouse.x, mouse.y)
                 }
             } else if (mouse.button === Qt.MiddleButton) {
                 setImageDragEnable(true)
@@ -82,7 +90,7 @@ Item {
                 }
             } else if (mouse.button === Qt.LeftButton) {
                 if (scalableImage.drawing) {
-                    scalableImage.updateRectROI(mouse)
+                    roiItem.updateByPos(mapToItem(_image, mouse.x, mouse.y))
                     scalableImage.drawing = false
                 }
             }
@@ -90,8 +98,9 @@ Item {
 
         onPositionChanged: function (mouse) {
             if (scalableImage.drawing) {
-                scalableImage.updateDrawingRect(mouse)
+                roiItem.updateByPos(mapToItem(_image, mouse.x, mouse.y))
             }
+            tooltip.text = "x: " + mouse.x + ", y: " + mouse.y
         }
 
         onWheel: function (wheel) {
@@ -110,7 +119,11 @@ Item {
         } else if (event.key === Qt.Key_Space) {
             fitInView()
         } else if (event.key === Qt.Key_Escape) {
-            scalableImage.clearROI()
+            getPos()
+        } else if (event.key === Qt.Key_Delete) {
+            if (roiItem.selected) {
+                roiItem.clear()
+            }
         }
     }
 
@@ -120,12 +133,39 @@ Item {
         }
     }
 
+    function getPos() {
+        console.log("scale", scale)
+        console.log("(0, 0)",
+                    mapToItem(scalableImage, 0, 0),
+                    mapFromItem(scalableImage, 0, 0),
+                    mapToItem(_image, 0, 0),
+                    mapFromItem(_image, 0, 0))
+        console.log("(center)",
+                    mapToItem(scalableImage, scalableImage.width / 2, scalableImage.height / 2),
+                    mapFromItem(scalableImage, scalableImage.width / 2, scalableImage.height / 2),
+                    mapToItem(_image, scalableImage.width / 2, scalableImage.height / 2),
+                    mapFromItem(_image, scalableImage.width / 2, scalableImage.height / 2))
+        console.log("(bottom right)",
+                    mapToItem(scalableImage, scalableImage.width, scalableImage.height),
+                    mapFromItem(scalableImage, scalableImage.width, scalableImage.height),
+                    mapToItem(_image, scalableImage.width, scalableImage.height),
+                    mapFromItem(_image, scalableImage.width, scalableImage.height))
+        console.log("image", _image.x, image.y, image.width, _image.height,
+                    mapToItem(scalableImage, _image.x, _image.y),
+                    mapFromItem(_image, _image.x, _image.y),)
+
+        var pt1 = mapToItem(_image, 0, 0)
+        var pt2 = mapToItem(_image, scalableImage.width, scalableImage.height)
+        imageRect = [pt1.x, pt1.y, pt2.x - pt1.x, pt2.y - pt1.y]
+    }
+
     Image {
         id: _image
         smooth: false
         asynchronous: true // 异步加载会导致自适应窗口出问题
         property real xOffset: Math.abs(width - paintedWidth) / 2 * scale
         property real yOffset: Math.abs(height - paintedHeight) / 2 * scale
+
         fillMode: Image.PreserveAspectFit
         onXChanged: {
             updateImagePos()
@@ -142,12 +182,14 @@ Item {
 
         onScaleChanged: {
             console.log("scale", scale)
+            getPos()
+
         }
 
         QuickEditableRect {
             id: roi_rect
+            visible: false
         }
-
     }
 
     onWidthChanged: {
@@ -160,16 +202,6 @@ Item {
             fitInView()
         }
     }
-
-    Rectangle {
-        id: drawingRect
-        visible: scalableImage.drawing
-        color: "transparent"
-        border.width: 1
-        border.color: scalableImage.drawingColor
-    }
-
-
 
     /**
      * @brief 设置图片是否可拖拽
@@ -196,7 +228,7 @@ Item {
         // 移动到窗口中央
         _image.x -= scaledImagePos.x - dx
         _image.y -= scaledImagePos.y - dy
-        // 不能将上述四条语句合并，因为 x/y 改变时会调用信号槽改变 scaledImagePos
+        // 不能将上述四条语句合并，因为 image.x/y 改变时会调用信号槽改变 scaledImagePos
     }
 
     /**
@@ -251,59 +283,5 @@ Item {
         // 移动到窗口中央
         _image.x -= scaledImagePos.x - dx
         _image.y -= scaledImagePos.y - dy
-    }
-
-    /**
-     * @brief 开始绘制矩形, 记录起始位置, 重置宽高避免上一次矩形遗留
-     * @param mouse
-     */
-    function startDrawingRect(mouse) {
-        scalableImage.startPoint.x = mouse.x
-        scalableImage.startPoint.y = mouse.y
-        drawingRect.width = 0
-        drawingRect.height = 0
-        scalableImage.drawing = true
-    }
-
-    /**
-     * @brief 更新绘制的矩形, 结束绘制
-     * @param mouse
-     */
-    function updateDrawingRect(mouse) {
-        drawingRect.width = Math.abs(mouse.x - scalableImage.startPoint.x)
-        drawingRect.height = Math.abs(mouse.y - scalableImage.startPoint.y)
-        drawingRect.x = Math.min(mouse.x, scalableImage.startPoint.x)
-        drawingRect.y = Math.min(mouse.y, scalableImage.startPoint.y)
-    }
-
-    /**
-     * @brief 添加一个矩形, 矩形被限制在图像区域内
-     * @param mouse
-     */
-    function updateRectROI(mouse) {
-        var pt1 = mapToItem(_image, scalableImage.startPoint)
-        var pt2 = mapToItem(_image, mouse.x, mouse.y)
-        var left = Math.min(pt1.x, pt2.x)
-        left = Math.max(0, left)
-        var right = Math.max(pt1.x, pt2.x)
-        right = Math.min(right, _image.width)
-        var top = Math.min(pt1.y, pt2.y)
-        top = Math.max(0, top)
-        var bottom = Math.max(pt1.y, pt2.y)
-        bottom = Math.min(bottom, _image.height)
-        var x = left
-        var y = top
-        var width = right - left
-        var height = bottom - top
-        if (width > 0 && height > 0) {
-            // console.log("add one rect", x, y, width, height)
-            var data = [x, y, width, height]
-            roiItem.updateByData(data)
-        }
-    }
-
-    function clearROI() {
-        roiItem.clear()
-        roiItem.visible = false
     }
 }
