@@ -61,8 +61,8 @@ CONFIRM_RESULT_PIC = './assets/confirm_result.png'
 TIMEOUT = 30
 
 
-EMAIL = '595517713@qq.com'
-PASSWORD = 'cCd808713/.'
+EMAIL = ''
+PASSWORD = ''
 
 
 
