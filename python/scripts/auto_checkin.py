@@ -61,8 +61,8 @@ CONFIRM_RESULT_PIC = './assets/confirm_result.png'
 TIMEOUT = 30
 
 
-EMAIL = ''
-PASSWORD = ''
+EMAIL = '1111'
+PASSWORD = '1111'
 
 
 
