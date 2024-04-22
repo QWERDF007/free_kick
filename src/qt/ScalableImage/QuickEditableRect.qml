@@ -1,7 +1,9 @@
 import QtQuick
 import QtQuick.Controls
 
-Rectangle {
+import ScalableImage
+
+QuickRectangle {
     id: editableRect
     property bool selected: false
     property real _m: Math.max(5, 10 / parent.scale) // 靠近顶点和边的距离阈值
@@ -9,9 +11,6 @@ Rectangle {
     property var roiData: [] // 矩形数据
     property point startPoint // 绘制七点, 坐标系是 parent 上的
 
-    onRoiDataChanged: {
-        console.log("roiData", roiData)
-    }
 
     color: "transparent"
     border.color: "red"

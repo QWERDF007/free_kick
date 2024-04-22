@@ -2,13 +2,15 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-import ScalableImage as T
+import ScalableImage
 
 Item {
     id: scalableImage
     clip: true
     width: 200
     height: 200
+
+    property bool _init: false
 
     property var imageRect
 
@@ -48,7 +50,8 @@ Item {
     property point startPoint
     property color drawingColor: "red"
     property bool drawing: false
-    property var roiItem: roi_circle
+//    property var roiItem: roi_rect
+    property var roiItem: roiLoader.item
 
     MouseArea {
         id: mouseArea
@@ -133,6 +136,20 @@ Item {
         }
     }
 
+    Component {
+        id: roi_rect
+        QuickEditableRect {
+            visible: false
+        }
+    }
+
+    Component {
+        id: roi_circle
+        QuickEditableCircle {
+            visible: false
+        }
+    }
+
     Image {
         id: _image
         smooth: false
@@ -160,29 +177,44 @@ Item {
             scalableImage.updateImageRect()
         }
 
-        // QuickEditableRect {
-        //     id: roi_rect
-        //     visible: false
-        // }
+//        QuickEditableRect {
+//            id: roi_rect
+//            visible: false
+//        }
 
-        QuickCircle {
-            id: roi_circle
-            center.x: 400
-            center.y: 400
-            radius: 200
-            color: "red"
+
+        Loader {
+            id: roiLoader
+            anchors.fill: parent
+            sourceComponent: roi_circle
         }
+
+//        QuickCircle {
+//            id: roi_circle
+//            center.x: 400
+//            center.y: 400
+//            radius: 200
+//            color: "red"
+//        }
     }
 
     onWidthChanged: {
         if (isFitInView) {
             fitInView()
         }
+        else if (!scalableImage._init && width && height) {
+            scalableImage.scaleInCenter(1.0)
+            scalableImage._init = true
+        }
         scalableImage.updateImageRect()
     }
     onHeightChanged: {
         if (isFitInView) {
             fitInView()
+        }
+        else if (!scalableImage._init && width && height) {
+            scalableImage.scaleInCenter(1.0)
+            scalableImage._init = true
         }
         scalableImage.updateImageRect()
     }
