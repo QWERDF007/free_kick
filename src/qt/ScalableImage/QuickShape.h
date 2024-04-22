@@ -147,6 +147,10 @@ private:
 
 //    QuickCenter *center_{nullptr};
 
+private slots:
+    void updateOnXChanged();
+    void updateOnYChanged();
+
 signals:
     void radiusChanged();
     void centerChanged();

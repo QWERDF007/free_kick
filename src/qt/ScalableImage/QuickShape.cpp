@@ -210,6 +210,8 @@ QuickCircle::QuickCircle(QQuickItem *parent)
     , center_(QPointF())
 {
     setAntialiasing(true);
+    connect(this, &QQuickItem::xChanged, this, &QuickCircle::updateOnXChanged);
+    connect(this, &QQuickItem::yChanged, this, &QuickCircle::updateOnYChanged);
 }
 
 qreal QuickCircle::radius() const
@@ -289,6 +291,25 @@ void QuickCircle::paint(QPainter *painter)
         painter->drawEllipse(QPointF(radius_,radius_), 3, 3);
     }
 }
+
+void QuickCircle::updateOnXChanged()
+{
+    qreal cx = x() + radius_;
+    if (cx == center_.x())
+        return;
+    center_.setX(cx);
+    emit centerChanged();
+}
+
+void QuickCircle::updateOnYChanged()
+{
+    qreal cy = y() + radius_;
+    if (cy == center_.y())
+        return;
+    center_.setY(cy);
+    emit centerChanged();
+}
+
 
 QuickPolygon::QuickPolygon(QQuickItem *parent)
     : QuickShape(parent)

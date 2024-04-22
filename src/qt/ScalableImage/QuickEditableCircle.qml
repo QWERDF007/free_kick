@@ -22,14 +22,8 @@ QuickCircle {
         property real bottom: editableCircle.height
     }
 
-    onXChanged: {
-        if (mouseArea.dragEnable) {
-            roiData = [editableCircle.center.x, editableCircle.center.y, editableCircle.radius]
-        }
-    }
-
-    onYChanged: {
-        if (mouseArea.dragEnable) {
+    onCenterChanged: {
+        if (visible) {
             roiData = [editableCircle.center.x, editableCircle.center.y, editableCircle.radius]
         }
     }
@@ -88,7 +82,13 @@ QuickCircle {
             if (dragEnable) {
 
             } else if (editableCircle.selected) {
-                if (isPointNearEdge(pos.x, pos.y, editableCircle.center.x, editableCircle.center.y, editableCircle._m)) {
+                if (dragType === 0) { // left or right
+                    editableCircle.updateByLeftRight(pos)
+                }
+                else if (dragType === 1) { // top or bottom
+                    editableCircle.updateByTopBottom(pos)
+                }
+                else if (isPointNearEdge(pos.x, pos.y, editableCircle.center.x, editableCircle.center.y, editableCircle._m)) {
                     var dx = pos.x - editableCircle.center.x
                     var dy = pos.y - editableCircle.center.y
                     var adx = Math.abs(dx)
@@ -96,11 +96,13 @@ QuickCircle {
                     if (adx > ady) {
                         editableCircle.setCursorShape(Qt.SizeHorCursor)
                         if (mouse.buttons & Qt.LeftButton) {
+                            dragType = 0
                             editableCircle.updateByLeftRight(pos)
                         }
                     } else {
                         editableCircle.setCursorShape(Qt.SizeVerCursor)
                         if (mouse.buttons & Qt.LeftButton) {
+                            dragType = 1
                             editableCircle.updateByTopBottom(pos)
                         }
                     }
@@ -140,8 +142,9 @@ QuickCircle {
             return
         editableCircle.center = Qt.point(data[0], data[1])
         editableCircle.radius = data[2]
-        if (!editableCircle.visible)
+        if (!editableCircle.visible) {
             editableCircle.visible = true
+        }
     }
 
     /**
@@ -149,8 +152,20 @@ QuickCircle {
      * @param pos parent 坐标系的鼠标位置
      */
     function updateByLeftRight(pos) {
-        var radius = pos.x - editableCircle.center.x
-        updateByData([editableCircle.center.x, editableCircle.center.y, Math.max(Math.abs(radius), editableCircle._m)])
+        var radius = Math.abs(pos.x - editableCircle.center.x)
+        if (radius > editableCircle.center.x) {
+            radius = editableCircle.center.x
+        }
+        if (editableCircle.center.x + radius > editableCircle.parent.width) {
+            radius = editableCircle.parent.width - editableCircle.center.x
+        }
+        if (radius > editableCircle.center.y) {
+            radius = editableCircle.center.y
+        }
+        if (editableCircle.center.y + radius > editableCircle.parent.height) {
+            radius = editableCircle.parent.height - editableCircle.center.y
+        }
+        updateByData([editableCircle.center.x, editableCircle.center.y, Math.max(radius, editableCircle._m)])
     }
 
     /**
@@ -158,8 +173,20 @@ QuickCircle {
      * @param pos parent 坐标系的鼠标位置
      */
     function updateByTopBottom(pos) {
-        var radius = pos.y - editableCircle.center.y
-        updateByData([editableCircle.center.x, editableCircle.center.y, Math.max(Math.abs(radius), editableCircle._m)])
+        var radius = Math.abs(pos.y - editableCircle.center.y)
+        if (radius > editableCircle.center.x) {
+            radius = editableCircle.center.x
+        }
+        if (editableCircle.center.x + radius > editableCircle.parent.width) {
+            radius = editableCircle.parent.width - editableCircle.center.x
+        }
+        if (radius > editableCircle.center.y) {
+            radius = editableCircle.center.y
+        }
+        if (editableCircle.center.y + radius > editableCircle.parent.height) {
+            radius = editableCircle.parent.height - editableCircle.center.y
+        }
+        updateByData([editableCircle.center.x, editableCircle.center.y, Math.max(radius, editableCircle._m)])
     }
 
     /**
@@ -185,15 +212,15 @@ QuickCircle {
         var x = pt1.x
         var y = pt1.y
         var radius = Math.max(dx, dy)
-        if (x - radius < 0)
+        if (radius > x)
             radius = x
-        if (y - radius < 0)
+        if (radius > y)
             radius = y
         if (x + radius > editableCircle.parent.width)
             radius = editableCircle.parent.width - x
         if (y + radius > editableCircle.parent.height)
             radius = editableCircle.parent.height - y
-        if (radius) {
+        if (radius > editableCircle._m) {
             editableCircle.updateByData([x, y, radius])
         }
     }
