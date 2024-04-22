@@ -1,8 +1,8 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import Qt5Compat.GraphicalEffects
-import QtQuick.Shapes
+
+import ScalableImage as T
 
 Item {
     id: scalableImage
@@ -10,7 +10,14 @@ Item {
     width: 200
     height: 200
 
-    property var imageRect: []
+    property var imageRect
+
+    signal updateImageRect
+    onUpdateImageRect: {
+        var pt1 = mapToItem(_image, 0, 0)
+        var pt2 = mapToItem(_image, scalableImage.width, scalableImage.height)
+        imageRect = [pt1.x, pt1.y, pt2.x - pt1.x, pt2.y - pt1.y]
+    }
 
     property alias image: _image
     property alias status: _image.status
@@ -41,13 +48,7 @@ Item {
     property point startPoint
     property color drawingColor: "red"
     property bool drawing: false
-    property var roiItem: roi_rect
-
-    ToolTip {
-        id: tooltip
-        delay: 200
-        visible: mouseArea.containsMouse
-    }
+    property var roiItem: roi_circle
 
     MouseArea {
         id: mouseArea
@@ -100,7 +101,6 @@ Item {
             if (scalableImage.drawing) {
                 roiItem.updateByPos(mapToItem(_image, mouse.x, mouse.y))
             }
-            tooltip.text = "x: " + mouse.x + ", y: " + mouse.y
         }
 
         onWheel: function (wheel) {
@@ -133,62 +133,44 @@ Item {
         }
     }
 
-    function getPos() {
-        console.log("scale", scale)
-        console.log("(0, 0)",
-                    mapToItem(scalableImage, 0, 0),
-                    mapFromItem(scalableImage, 0, 0),
-                    mapToItem(_image, 0, 0),
-                    mapFromItem(_image, 0, 0))
-        console.log("(center)",
-                    mapToItem(scalableImage, scalableImage.width / 2, scalableImage.height / 2),
-                    mapFromItem(scalableImage, scalableImage.width / 2, scalableImage.height / 2),
-                    mapToItem(_image, scalableImage.width / 2, scalableImage.height / 2),
-                    mapFromItem(_image, scalableImage.width / 2, scalableImage.height / 2))
-        console.log("(bottom right)",
-                    mapToItem(scalableImage, scalableImage.width, scalableImage.height),
-                    mapFromItem(scalableImage, scalableImage.width, scalableImage.height),
-                    mapToItem(_image, scalableImage.width, scalableImage.height),
-                    mapFromItem(_image, scalableImage.width, scalableImage.height))
-        console.log("image", _image.x, image.y, image.width, _image.height,
-                    mapToItem(scalableImage, _image.x, _image.y),
-                    mapFromItem(_image, _image.x, _image.y),)
-
-        var pt1 = mapToItem(_image, 0, 0)
-        var pt2 = mapToItem(_image, scalableImage.width, scalableImage.height)
-        imageRect = [pt1.x, pt1.y, pt2.x - pt1.x, pt2.y - pt1.y]
-    }
-
     Image {
         id: _image
         smooth: false
-        asynchronous: true // 异步加载会导致自适应窗口出问题
-        property real xOffset: Math.abs(width - paintedWidth) / 2 * scale
-        property real yOffset: Math.abs(height - paintedHeight) / 2 * scale
-
+        asynchronous: true
         fillMode: Image.PreserveAspectFit
         onXChanged: {
             updateImagePos()
+            scalableImage.updateImageRect()
         }
         onYChanged: {
             updateImagePos()
+            scalableImage.updateImageRect()
         }
         onStatusChanged: {
             if (_image.status === Image.Ready) {
-                fitInView()
+                if (isFitInView) {
+                    fitInView()
+                }
+                scalableImage.updateImageRect()
             }
         }
         transformOrigin: Item.TopLeft
 
         onScaleChanged: {
-            console.log("scale", scale)
-            getPos()
-
+            scalableImage.updateImageRect()
         }
 
-        QuickEditableRect {
-            id: roi_rect
-            visible: false
+        // QuickEditableRect {
+        //     id: roi_rect
+        //     visible: false
+        // }
+
+        QuickCircle {
+            id: roi_circle
+            center.x: 400
+            center.y: 400
+            radius: 200
+            color: "red"
         }
     }
 
@@ -196,11 +178,13 @@ Item {
         if (isFitInView) {
             fitInView()
         }
+        scalableImage.updateImageRect()
     }
     onHeightChanged: {
         if (isFitInView) {
             fitInView()
         }
+        scalableImage.updateImageRect()
     }
 
     /**
@@ -216,6 +200,8 @@ Item {
      * @param scale
      */
     function scaleInCenter(scale) {
+        if (scalableImage.width === 0 || scalableImage.height === 0 || _image.sourceSize.height === 0 || _image.sourceSize.width === 0)
+            return
         // 缩放后的原点
         var scaleOrigin = mapToItem(_image, 0, 0)
         _image.scale = Math.min(Math.max(from, scale), to)
@@ -236,6 +222,8 @@ Item {
      * @param wheel
      */
     function scaleImageByWheel(wheel) {
+        if (scalableImage.width === 0 || scalableImage.height === 0 || _image.sourceSize.height === 0 || _image.sourceSize.width === 0)
+            return      
         // 鼠标相对于缩放前图像的位置
         var scaleOrigin = mapToItem(_image, wheel.x, wheel.y)
         // 缩放
@@ -268,7 +256,7 @@ Item {
      * @brief 图像适应窗口
      */
     function fitInView() {
-        if (!scalableImage.isFitInView || _image.sourceSize.height === 0 || _image.sourceSize.width === 0)
+        if (scalableImage.width === 0 || scalableImage.height === 0 || _image.sourceSize.height === 0 || _image.sourceSize.width === 0)
             return
         scalableImage.imageSourceScale = Math.min(scalableImage.height / _image.sourceSize.height, scalableImage.width / _image.sourceSize.width)
         // 缩放后的原点
