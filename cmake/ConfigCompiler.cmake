@@ -25,7 +25,8 @@ endif()
 # -Wunused：对未使用的变量、函数或标签发出警告
 # Match warning setup with GVS
 if (MSVC)
-    set(C_WARNING_FLAGS "-Wall")
+#    set(C_WARNING_FLAGS "-Wall")
+    set(C_WARNING_FLAGS "-W4")
     # set(CXX_WARNING_FLAGS "/permissive-")
 else ()
     set(C_WARNING_FLAGS "-Wall -Wno-unknown-pragmas -Wpointer-arith -Wmissing-declarations -Wredundant-decls -Wmultichar -Wno-unused-local-typedefs -Wunused")
