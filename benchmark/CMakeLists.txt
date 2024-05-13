@@ -1,3 +1,5 @@
 add_subdirectory(utils)
 add_subdirectory(feature_extractor)
-add_subdirectory(qt)
+if(BUILD_QT)
+    add_subdirectory(qt)
+endif()
