@@ -12,11 +12,11 @@
 
 namespace free_kick::common {
 
-class CCrashHandler
+class WindowsCCrashHandler
 {
 public:
-    explicit CCrashHandler() = default;
-    ~CCrashHandler()         = default;
+    explicit WindowsCCrashHandler() = default;
+    ~WindowsCCrashHandler()         = default;
 
     void setup();
 

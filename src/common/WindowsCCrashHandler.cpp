@@ -1,4 +1,4 @@
-#include "WindowsCrashHandler.h"
+#include "WindowsCCrashHandler.h"
 
 // clang-format off
 #if defined(_WIN32)
@@ -40,7 +40,7 @@ namespace free_kick::common {
  * @param code 
  * @return LPCSTR 
  */
-LPCSTR CCrashHandler::GetExceptionName(DWORD code)
+LPCSTR WindowsCCrashHandler::GetExceptionName(DWORD code)
 {
     switch (code)
     {
@@ -77,7 +77,7 @@ LPCSTR CCrashHandler::GetExceptionName(DWORD code)
 
 #undef EX_CASE
 
-void CCrashHandler::GetExceptionPointers(DWORD dwExceptionCode, EXCEPTION_POINTERS **ppExceptionPointers)
+void WindowsCCrashHandler::GetExceptionPointers(DWORD dwExceptionCode, EXCEPTION_POINTERS **ppExceptionPointers)
 {
 	// The following code was taken from VC++ 8.0 CRT (invarg.c: line 104)
 	EXCEPTION_RECORD ExceptionRecord;
@@ -142,7 +142,7 @@ void CCrashHandler::GetExceptionPointers(DWORD dwExceptionCode, EXCEPTION_POINTE
 
 // clang-format on
 
-HMODULE CCrashHandler::GetExceptionModule(HANDLE process, LPVOID address, LPSTR module_name)
+HMODULE WindowsCCrashHandler::GetExceptionModule(HANDLE process, LPVOID address, LPSTR module_name)
 {
     HMODULE module_list[1024];
     DWORD   size_needed = 0;
@@ -175,7 +175,7 @@ HMODULE CCrashHandler::GetExceptionModule(HANDLE process, LPVOID address, LPSTR 
     return module_list[cur_module];
 }
 
-void CCrashHandler::PrintStackTrace(HANDLE process, const ULONG frames_to_skip)
+void WindowsCCrashHandler::PrintStackTrace(HANDLE process, const ULONG frames_to_skip)
 {
     static constexpr int TRACE_STACK_LIMIT = 128;
 
@@ -219,7 +219,8 @@ void CCrashHandler::PrintStackTrace(HANDLE process, const ULONG frames_to_skip)
     SymCleanup(process);
 }
 
-void CCrashHandler::HandleAccessViolation(HANDLE process, LPEXCEPTION_POINTERS exception, const ULONG frames_to_skip)
+void WindowsCCrashHandler::HandleAccessViolation(HANDLE process, LPEXCEPTION_POINTERS exception,
+                                                 const ULONG frames_to_skip)
 {
     char  message[MAX_PATH + 512];
     char  module[MAX_PATH];
@@ -263,7 +264,8 @@ void CCrashHandler::HandleAccessViolation(HANDLE process, LPEXCEPTION_POINTERS e
 #    endif
 }
 
-void CCrashHandler::HandleCommonException(HANDLE process, LPEXCEPTION_POINTERS exception, const ULONG frames_to_skip)
+void WindowsCCrashHandler::HandleCommonException(HANDLE process, LPEXCEPTION_POINTERS exception,
+                                                 const ULONG frames_to_skip)
 {
     char  message[MAX_PATH + 255];
     char  module[MAX_PATH];
@@ -282,7 +284,7 @@ void CCrashHandler::HandleCommonException(HANDLE process, LPEXCEPTION_POINTERS e
 #    endif
 }
 
-void CCrashHandler::CreateMiniDump(EXCEPTION_POINTERS *pExcPtrs)
+void WindowsCCrashHandler::CreateMiniDump(EXCEPTION_POINTERS *pExcPtrs)
 {
     HMODULE                        hDbgHelp = NULL;
     HANDLE                         hFile    = NULL;
@@ -343,7 +345,7 @@ void CCrashHandler::CreateMiniDump(EXCEPTION_POINTERS *pExcPtrs)
     FreeLibrary(hDbgHelp);
 }
 
-LONG WINAPI CCrashHandler::UnhandledExceptionHandler(LPEXCEPTION_POINTERS exception)
+LONG WINAPI WindowsCCrashHandler::UnhandledExceptionHandler(LPEXCEPTION_POINTERS exception)
 {
     HANDLE process = GetCurrentProcess();
 
@@ -364,7 +366,7 @@ LONG WINAPI CCrashHandler::UnhandledExceptionHandler(LPEXCEPTION_POINTERS except
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
-void __cdecl CCrashHandler::TerminateHandler()
+void __cdecl WindowsCCrashHandler::TerminateHandler()
 {
     // Abnormal program termination (terminate() function was called)
 
@@ -378,7 +380,7 @@ void __cdecl CCrashHandler::TerminateHandler()
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
-void __cdecl CCrashHandler::UnexpectedHandler()
+void __cdecl WindowsCCrashHandler::UnexpectedHandler()
 {
     // Unexpected error (unexpected() function was called)
 
@@ -392,7 +394,7 @@ void __cdecl CCrashHandler::UnexpectedHandler()
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
-void CCrashHandler::PureCallHandler()
+void WindowsCCrashHandler::PureCallHandler()
 {
     EXCEPTION_POINTERS *exception = NULL;
     GetExceptionPointers(0, &exception);
@@ -406,8 +408,8 @@ void CCrashHandler::PureCallHandler()
 
 #    define UNUSED(x) (void)(x);
 
-void __cdecl CCrashHandler::InvalidParameterHandler(const wchar_t *expression, const wchar_t *function,
-                                                    const wchar_t *file, unsigned int line, uintptr_t pReserved)
+void __cdecl WindowsCCrashHandler::InvalidParameterHandler(const wchar_t *expression, const wchar_t *function,
+                                                           const wchar_t *file, unsigned int line, uintptr_t pReserved)
 {
     // Invalid parameter exception
 
@@ -429,7 +431,7 @@ void __cdecl CCrashHandler::InvalidParameterHandler(const wchar_t *expression, c
 
 #    undef UNUSED
 
-int __cdecl CCrashHandler::NewHandler(size_t)
+int __cdecl WindowsCCrashHandler::NewHandler(size_t)
 {
     // 'new' operator memory allocation exception
 
@@ -444,7 +446,7 @@ int __cdecl CCrashHandler::NewHandler(size_t)
     return 0;
 }
 
-void CCrashHandler::SIGABRTHandler(int)
+void WindowsCCrashHandler::SIGABRTHandler(int)
 {
     // Caught SIGABRT C++ signal
 
@@ -458,7 +460,7 @@ void CCrashHandler::SIGABRTHandler(int)
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
-void CCrashHandler::SIGFPEHandler(int, int)
+void WindowsCCrashHandler::SIGFPEHandler(int, int)
 {
     // Floating point exception (SIGFPE)
 
@@ -471,7 +473,7 @@ void CCrashHandler::SIGFPEHandler(int, int)
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
-void CCrashHandler::SIGILLHandler(int)
+void WindowsCCrashHandler::SIGILLHandler(int)
 {
     // Illegal instruction (SIGILL)
 
@@ -485,7 +487,7 @@ void CCrashHandler::SIGILLHandler(int)
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
-void CCrashHandler::SIGINTHandler(int)
+void WindowsCCrashHandler::SIGINTHandler(int)
 {
     // Interruption (SIGINT)
 
@@ -499,7 +501,7 @@ void CCrashHandler::SIGINTHandler(int)
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
-void CCrashHandler::SIGSEGVHandler(int)
+void WindowsCCrashHandler::SIGSEGVHandler(int)
 {
     // Invalid storage access (SIGSEGV)
 
@@ -512,7 +514,7 @@ void CCrashHandler::SIGSEGVHandler(int)
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
-void CCrashHandler::SIGTERMHandler(int)
+void WindowsCCrashHandler::SIGTERMHandler(int)
 {
     // Termination request (SIGTERM)
 
@@ -526,7 +528,7 @@ void CCrashHandler::SIGTERMHandler(int)
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
-void CCrashHandler::SetProcessExceptionHandlder()
+void WindowsCCrashHandler::SetProcessExceptionHandlder()
 {
     // Install top-level SEH handler
     SetUnhandledExceptionFilter(UnhandledExceptionHandler);
@@ -558,7 +560,7 @@ void CCrashHandler::SetProcessExceptionHandlder()
     signal(SIGTERM, SIGTERMHandler);
 }
 
-void CCrashHandler::SetThreadExceptionHandlder()
+void WindowsCCrashHandler::SetThreadExceptionHandlder()
 {
     // Catch terminate() calls.
     // In a multithreaded environment, terminate functions are maintained
@@ -587,7 +589,7 @@ void CCrashHandler::SetThreadExceptionHandlder()
 
 #endif
 
-void CCrashHandler::setup()
+void WindowsCCrashHandler::setup()
 {
 #if defined(_WIN32)
     SetProcessExceptionHandlder();
