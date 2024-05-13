@@ -1,33 +1,34 @@
 #include "WindowsCCrashHandler.h"
 
-// clang-format off
 #if defined(_WIN32)
-
-#include <rtcapi.h>
-#include <DbgHelp.h>
-#include <psapi.h>
-#include <signal.h>
-#include <new.h>
-#include <tchar.h>
+#    include <DbgHelp.h>
+#    include <new.h>
+#    include <psapi.h>
+#    include <rtcapi.h>
+#    include <signal.h>
+#    include <tchar.h>
+#endif
 
 #include <iostream>
 
 #ifndef _AddressOfReturnAddress
 
 // Taken from: http://msdn.microsoft.com/en-us/library/s975zw7k(VS.71).aspx
-#ifdef __cplusplus
-    #define EXTERNC extern "C"
-#else
-    #define EXTERNC
+#    ifdef __cplusplus
+#        define EXTERNC extern "C"
+#    else
+#        define EXTERNC
+#    endif
+// _ReturnAddress and _AddressOfReturnAddress should be prototyped before use
+EXTERNC void *_AddressOfReturnAddress(void);
+EXTERNC void *_ReturnAddress(void);
 #endif
 
-// _ReturnAddress and _AddressOfReturnAddress should be prototyped before use 
-EXTERNC void * _AddressOfReturnAddress(void);
-EXTERNC void * _ReturnAddress(void);
-
-#endif 
-
 namespace free_kick::common {
+
+// clang-format off
+
+#if defined(_WIN32)
 
 // https://win32easy.blogspot.com/2011/03/exception-handling-inform-your-users_26.html
 
