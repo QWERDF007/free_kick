@@ -7,9 +7,7 @@ add_executable(utils_test
 
 target_link_libraries(utils_test 
 PUBLIC
-    GTest::gtest_main
-    GTest::gmock
-    utils_headers
+    GTest::gtest_main GTest::gmock
 PRIVATE
-    utils
+    free_kick_utils free_kick_utils_headers
 )

@@ -1,12 +1,18 @@
-file(GLOB UTILS_SRCS *.cpp)
+set(TRAGET_NAME "free_kick_utils")
+set(HEADER_TARGET_NAME "${TRAGET_NAME}_headers")
 
-add_library(utils STATIC
-    ${UTILS_SRCS}
+# 获取所有源文件的相对路径
+file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
+
+# 获取所有头文件的相对路径
+file(GLOB_RECURSE HEADERS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.h *.hpp)
+
+add_library(${TRAGET_NAME}  STATIC
+    ${SOURCES}
+    ${HEADERS}
 )
 
-target_include_directories(utils PUBLIC .)
-
-add_library(utils_headers INTERFACE)
-target_include_directories(utils_headers
+add_library(${HEADER_TARGET_NAME} INTERFACE)
+target_include_directories(${HEADER_TARGET_NAME}
     INTERFACE .
 )
