@@ -16,9 +16,9 @@
 
 // Taken from: http://msdn.microsoft.com/en-us/library/s975zw7k(VS.71).aspx
 #ifdef __cplusplus
-#define EXTERNC extern "C"
+    #define EXTERNC extern "C"
 #else
-#define EXTERNC
+    #define EXTERNC
 #endif
 
 // _ReturnAddress and _AddressOfReturnAddress should be prototyped before use 
