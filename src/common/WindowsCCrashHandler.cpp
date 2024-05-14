@@ -211,13 +211,9 @@ std::string WindowsCCrashHandler::GetCurrentTraceBackString(HANDLE process, cons
         bool  found_line   = SymGetLineFromAddr(process, (DWORD64)(stack_trace[i]), &displacement, &line);
         bool  found_symbol = SymFromAddr(process, (DWORD64)(stack_trace[i]), 0, symbol);
         if (found_line && found_symbol)
-        {
-            sout << "  File \"" << line.FileName << "\", line " << line.LineNumber << " in " << symbol->Name
-                 << std::endl;
-            sout << "    " << symbol->Name << std::endl;
-        }
+            sout << "File \"" << line.FileName << "\", line " << line.LineNumber << " in " << symbol->Name << std::endl;
         else if (found_line)
-            sout << "  File \"" << line.FileName << "\", line " << line.LineNumber << std::endl;
+            sout << "File \"" << line.FileName << "\", line " << line.LineNumber << std::endl;
         // 清理符号缓存
         free(symbol);
     }
