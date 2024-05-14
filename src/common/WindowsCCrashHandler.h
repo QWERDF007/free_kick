@@ -2,13 +2,11 @@
 
 // https://www.codeproject.com/Articles/207464/Exception-Handling-in-Visual-Cplusplus
 
-// clang-format off
+#include <string>
 
 #if defined(_WIN32)
-#include <Windows.h>
+#    include <Windows.h>
 #endif
-
-// clang-format on
 
 namespace free_kick::common {
 
@@ -50,14 +48,14 @@ private:
      * @brief 通过 `MiniDumpWriteDump` 将用户模式小型转储信息写入指定的文件 crashdump.dmp
      * @param exception 异常信息指针
      */
-    static void CreateMiniDump(EXCEPTION_POINTERS *exception);
+    static void CreateMiniDump(const std::string &filename, EXCEPTION_POINTERS *exception, const std::string &msg);
 
     /**
      * @brief 打印调用栈，文件名，行号，函数名称
      * @note 只在 Debug 模式下生效
      * @param process 进程句柄
      */
-    static void PrintStackTrace(HANDLE process, const ULONG frames_to_skip = 0);
+    static std::string GetCurrentTraceBackString(HANDLE process, const ULONG frames_to_skip = 0);
 
     /**
      * @brief 处理内存访问违例异常，打印类型，模块名称，线程ID，地址，偏移，代码基

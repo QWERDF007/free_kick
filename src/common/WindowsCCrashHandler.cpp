@@ -1,15 +1,16 @@
 #include "WindowsCCrashHandler.h"
 
 #if defined(_WIN32)
-#    include <DbgHelp.h>
-#    include <new.h>
-#    include <psapi.h>
-#    include <rtcapi.h>
-#    include <signal.h>
-#    include <tchar.h>
+#    include <DbgHelp.h> // for SymGetLineFromAddr etc.
+#    include <new.h>     // for _set_new_handler
+#    include <psapi.h>   // for EnumProcessModules
+#    include <signal.h>  // for signal etc.
+#    include <tchar.h>   // for _T
 #endif
 
+#include <fstream>
 #include <iostream>
+#include <sstream>
 
 #ifndef _AddressOfReturnAddress
 
@@ -32,15 +33,11 @@ namespace free_kick::common {
 
 // https://win32easy.blogspot.com/2011/03/exception-handling-inform-your-users_26.html
 
-#define EX_CASE(code)     \
-    case code:            \
+
+#define EX_CASE(code) \
+    case code:        \
         return #code;
 
-/**
- * @brief 获取异常名称, 通过宏将异常代码转换为字符串
- * @param code 
- * @return LPCSTR 
- */
 LPCSTR WindowsCCrashHandler::GetExceptionName(DWORD code)
 {
     switch (code)
@@ -176,7 +173,7 @@ HMODULE WindowsCCrashHandler::GetExceptionModule(HANDLE process, LPVOID address,
     return module_list[cur_module];
 }
 
-void WindowsCCrashHandler::PrintStackTrace(HANDLE process, const ULONG frames_to_skip)
+std::string WindowsCCrashHandler::GetCurrentTraceBackString(HANDLE process, const ULONG frames_to_skip)
 {
     static constexpr int TRACE_STACK_LIMIT = 128;
 
@@ -191,12 +188,17 @@ void WindowsCCrashHandler::PrintStackTrace(HANDLE process, const ULONG frames_to
 
     // 获取当前进程的符号选项
     sym_options = SymGetOptions();
-    // 设置符号选项，确保我们获取源文件信息
+    // 设置符号选项，确保获取源文件信息
     sym_options |= SYMOPT_LOAD_LINES;
     sym_options |= SYMOPT_DEBUG;
     SymSetOptions(sym_options);
 
-    std::cerr << "\nTraceback (most recent call last): " << std::endl;
+    std::ostringstream sout;
+    sout << "\n\n--------------------------------------\n";
+    sout << "C++ Traceback (most recent call last):";
+    sout << "\n--------------------------------------\n";
+
+    // std::cerr << "\nTraceback (most recent call last): " << std::endl;
     constexpr int end_idx = 0; // 0: PrintStackTrace
     for (int i = frames_captured - 1; i >= end_idx; --i)
     {
@@ -210,20 +212,55 @@ void WindowsCCrashHandler::PrintStackTrace(HANDLE process, const ULONG frames_to
         bool  found_symbol = SymFromAddr(process, (DWORD64)(stack_trace[i]), 0, symbol);
         if (found_line && found_symbol)
         {
-            std::cerr << "  File \"" << line.FileName << "\", line " << line.LineNumber << " in " << symbol->Name
-                      << std::endl;
-            std::cerr << "    " << symbol->Name << std::endl;
+            sout << "  File \"" << line.FileName << "\", line " << line.LineNumber << " in " << symbol->Name
+                 << std::endl;
+            sout << "    " << symbol->Name << std::endl;
         }
+        else if (found_line)
+            sout << "  File \"" << line.FileName << "\", line " << line.LineNumber << std::endl;
         // 清理符号缓存
         free(symbol);
     }
     SymCleanup(process);
+    return sout.str();
+}
+
+void WindowsCCrashHandler::CreateMiniDump(const std::string &filename, EXCEPTION_POINTERS *exception,
+                                          const std::string &msg)
+{
+    std::ofstream ofs(filename + ".txt");
+    if (ofs.is_open())
+    {
+        ofs << msg << std::endl;
+        ofs.close();
+    }
+
+    HANDLE hFile = NULL;
+    // Create the minidump file
+    hFile = CreateFile(_T(filename.c_str()), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    // Couldn't create file
+    if (hFile == INVALID_HANDLE_VALUE)
+        return;
+
+    MINIDUMP_EXCEPTION_INFORMATION ExceptionParam;
+    ExceptionParam.ThreadId          = GetCurrentThreadId();
+    ExceptionParam.ExceptionPointers = exception;
+    ExceptionParam.ClientPointers    = FALSE;
+
+    // Write minidump to the file
+    bool bWriteDump = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, MiniDumpNormal,
+                                        &ExceptionParam, NULL, NULL);
+    // Error writing dump.
+    if (!bWriteDump)
+        return;
+
+    // Close file
+    CloseHandle(hFile);
 }
 
 void WindowsCCrashHandler::HandleAccessViolation(HANDLE process, LPEXCEPTION_POINTERS exception,
                                                  const ULONG frames_to_skip)
 {
-    char  message[MAX_PATH + 512];
     char  module[MAX_PATH];
     char *module_name = NULL;
     if (GetExceptionModule(process, exception->ExceptionRecord->ExceptionAddress, module))
@@ -251,99 +288,41 @@ void WindowsCCrashHandler::HandleAccessViolation(HANDLE process, LPEXCEPTION_POI
         break;
     }
 
-    const char *exception_name = GetExceptionName(exception->ExceptionRecord->ExceptionCode);
-    sprintf_s(message,
-              "An exception has occured which was not handled!\nCode: %s\nModule: %s\n"
-              "The thread %u tried to %s memory at address 0x%08X which is inaccessible!\n"
-              "Offset: 0x%08X\nCodebase: 0x%08X",
-              exception_name, module_name, GetCurrentThreadId(), access_type,
-              exception->ExceptionRecord->ExceptionInformation[1], offset, code_base);
-    std::cerr << message << std::endl;
-
-#    ifdef _DEBUG
-    PrintStackTrace(process, frames_to_skip);
+    std::ostringstream sout;
+    sout << "An exception has occured which was not handled!\n"
+         << "Code: " << GetExceptionName(exception->ExceptionRecord->ExceptionCode) << "\n"
+         << "Module: " << module_name << "\n"
+         << "The thread " << GetCurrentThreadId() << " tried to " << access_type << " memory at address 0x" << std::hex
+         << exception->ExceptionRecord->ExceptionInformation[1] << " which is inaccessible!\n"
+         << "Offset: 0x" << std::hex << offset << "\n"
+         << "Codebase: 0x" << std::hex << code_base;
+#    ifndef NDEBUG
+    sout << GetCurrentTraceBackString(process, frames_to_skip);
 #    endif
+    auto msg = sout.str();
+    CreateMiniDump("crashdump.dmp", exception, msg);
+    std::cerr << msg << std::endl;
 }
 
 void WindowsCCrashHandler::HandleCommonException(HANDLE process, LPEXCEPTION_POINTERS exception,
                                                  const ULONG frames_to_skip)
 {
-    char  message[MAX_PATH + 255];
     char  module[MAX_PATH];
     char *module_name = NULL;
     if (GetExceptionModule(process, exception->ExceptionRecord->ExceptionAddress, module))
         module_name = module;
     else
         module_name = "Unknown module!";
-    const char *exception_name = GetExceptionName(exception->ExceptionRecord->ExceptionCode);
-    sprintf_s(message, "An exception has occured which was not handled!\nCode: %s\nModule: %s", exception_name,
-              module_name);
-    std::cerr << message << std::endl;
-
-#    ifdef _DEBUG
-    PrintStackTrace(process, frames_to_skip);
+    std::ostringstream sout;
+    sout << "An exception has occured which was not handled!\n"
+         << "Code: " << GetExceptionName(exception->ExceptionRecord->ExceptionCode) << "\n"
+         << "Module: " << module_name << "\n";
+#    ifndef NDEBUG
+    sout << GetCurrentTraceBackString(process, frames_to_skip);
 #    endif
-}
-
-void WindowsCCrashHandler::CreateMiniDump(EXCEPTION_POINTERS *pExcPtrs)
-{
-    HMODULE                        hDbgHelp = NULL;
-    HANDLE                         hFile    = NULL;
-    MINIDUMP_EXCEPTION_INFORMATION mei;
-    MINIDUMP_CALLBACK_INFORMATION  mci;
-
-    // Load dbghelp.dll
-    hDbgHelp = LoadLibrary(_T("dbghelp.dll"));
-    if (hDbgHelp == NULL)
-    {
-        // Error - couldn't load dbghelp.dll
-        return;
-    }
-
-    // Create the minidump file
-    hFile = CreateFile(_T("crashdump.dmp"), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-
-    if (hFile == INVALID_HANDLE_VALUE)
-    {
-        // Couldn't create file
-        return;
-    }
-
-    // Write minidump to the file
-    mei.ThreadId          = GetCurrentThreadId();
-    mei.ExceptionPointers = pExcPtrs;
-    mei.ClientPointers    = FALSE;
-    mci.CallbackRoutine   = NULL;
-    mci.CallbackParam     = NULL;
-
-    typedef BOOL(WINAPI * LPMINIDUMPWRITEDUMP)(HANDLE hProcess, DWORD ProcessId, HANDLE hFile, MINIDUMP_TYPE DumpType,
-                                               CONST PMINIDUMP_EXCEPTION_INFORMATION   ExceptionParam,
-                                               CONST PMINIDUMP_USER_STREAM_INFORMATION UserEncoderParam,
-                                               CONST PMINIDUMP_CALLBACK_INFORMATION    CallbackParam);
-
-    LPMINIDUMPWRITEDUMP pfnMiniDumpWriteDump = (LPMINIDUMPWRITEDUMP)GetProcAddress(hDbgHelp, "MiniDumpWriteDump");
-    if (!pfnMiniDumpWriteDump)
-    {
-        // Bad MiniDumpWriteDump function
-        return;
-    }
-
-    HANDLE hProcess    = GetCurrentProcess();
-    DWORD  dwProcessId = GetCurrentProcessId();
-
-    BOOL bWriteDump = pfnMiniDumpWriteDump(hProcess, dwProcessId, hFile, MiniDumpNormal, &mei, NULL, &mci);
-
-    if (!bWriteDump)
-    {
-        // Error writing dump.
-        return;
-    }
-
-    // Close file
-    CloseHandle(hFile);
-
-    // Unload dbghelp.dll
-    FreeLibrary(hDbgHelp);
+    auto msg = sout.str();
+    CreateMiniDump("crashdump.dmp", exception, msg);
+    std::cerr << msg << std::endl;
 }
 
 LONG WINAPI WindowsCCrashHandler::UnhandledExceptionHandler(LPEXCEPTION_POINTERS exception)
@@ -360,8 +339,6 @@ LONG WINAPI WindowsCCrashHandler::UnhandledExceptionHandler(LPEXCEPTION_POINTERS
         break;
     }
 
-    CreateMiniDump(exception);
-
     TerminateProcess(GetCurrentProcess(), 1);
 
     return EXCEPTION_EXECUTE_HANDLER;
@@ -376,8 +353,6 @@ void __cdecl WindowsCCrashHandler::TerminateHandler()
 
     HandleCommonException(GetCurrentProcess(), exception, 5);
 
-    CreateMiniDump(exception);
-
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
@@ -390,8 +365,6 @@ void __cdecl WindowsCCrashHandler::UnexpectedHandler()
 
     HandleCommonException(GetCurrentProcess(), exception, 5);
 
-    CreateMiniDump(exception);
-
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
@@ -401,8 +374,6 @@ void WindowsCCrashHandler::PureCallHandler()
     GetExceptionPointers(0, &exception);
 
     HandleCommonException(GetCurrentProcess(), exception, 5);
-
-    CreateMiniDump(exception);
 
     TerminateProcess(GetCurrentProcess(), 1);
 }
@@ -425,8 +396,6 @@ void __cdecl WindowsCCrashHandler::InvalidParameterHandler(const wchar_t *expres
 
     HandleCommonException(GetCurrentProcess(), exception, 5);
 
-    CreateMiniDump(exception);
-
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
@@ -441,8 +410,6 @@ int __cdecl WindowsCCrashHandler::NewHandler(size_t)
 
     HandleCommonException(GetCurrentProcess(), exception, 5);
 
-    CreateMiniDump(exception);
-
     TerminateProcess(GetCurrentProcess(), 1);
     return 0;
 }
@@ -456,8 +423,6 @@ void WindowsCCrashHandler::SIGABRTHandler(int)
 
     HandleCommonException(GetCurrentProcess(), exception, 5);
 
-    CreateMiniDump(exception);
-
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
@@ -468,8 +433,6 @@ void WindowsCCrashHandler::SIGFPEHandler(int, int)
     EXCEPTION_POINTERS *exception = (PEXCEPTION_POINTERS)_pxcptinfoptrs;
 
     HandleCommonException(GetCurrentProcess(), exception, 5);
-
-    CreateMiniDump(exception);
 
     TerminateProcess(GetCurrentProcess(), 1);
 }
@@ -483,8 +446,6 @@ void WindowsCCrashHandler::SIGILLHandler(int)
 
     HandleCommonException(GetCurrentProcess(), exception, 5);
 
-    CreateMiniDump(exception);
-
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
@@ -497,8 +458,6 @@ void WindowsCCrashHandler::SIGINTHandler(int)
 
     HandleCommonException(GetCurrentProcess(), exception, 5);
 
-    CreateMiniDump(exception);
-
     TerminateProcess(GetCurrentProcess(), 1);
 }
 
@@ -509,8 +468,6 @@ void WindowsCCrashHandler::SIGSEGVHandler(int)
     PEXCEPTION_POINTERS exception = (PEXCEPTION_POINTERS)_pxcptinfoptrs;
 
     HandleAccessViolation(GetCurrentProcess(), exception, 5);
-
-    CreateMiniDump(exception);
 
     TerminateProcess(GetCurrentProcess(), 1);
 }
@@ -523,8 +480,6 @@ void WindowsCCrashHandler::SIGTERMHandler(int)
     GetExceptionPointers(0, &exception);
 
     HandleCommonException(GetCurrentProcess(), exception, 5);
-
-    CreateMiniDump(exception);
 
     TerminateProcess(GetCurrentProcess(), 1);
 }

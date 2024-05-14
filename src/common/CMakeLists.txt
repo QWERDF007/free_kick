@@ -12,10 +12,9 @@ add_library(${TRAGET_NAME} STATIC
     ${HEADERS}
 )
 if (WIN32)
-    target_link_libraries(${TRAGET_NAME} 
-        PRIVATE
-            Dbghelp
-    )
+    target_link_libraries(${TRAGET_NAME} PRIVATE Dbghelp)
+else()
+    target_link_libraries(${TRAGET_NAME} PRIVATE dl)
 endif()
 
 add_library(${HEADER_TARGET_NAME} INTERFACE)
