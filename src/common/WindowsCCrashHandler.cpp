@@ -192,9 +192,9 @@ std::string WindowsCCrashHandler::GetExceptionModule(HANDLE process, LPVOID addr
                 cur_module = i;
         }
     }
-
     if (cur_module == -1)
         return "Unknown module";
+
 #    ifdef UNICODE
     WCHAR module_name[MAX_PATH];
 #    else
@@ -329,7 +329,7 @@ void WindowsCCrashHandler::HandleAccessViolation(HANDLE process, LPEXCEPTION_POI
          << "The thread " << GetCurrentThreadId() << " tried to " << access_type << " memory at address 0x" << std::hex
          << exception->ExceptionRecord->ExceptionInformation[1] << " which is inaccessible!\n"
          << "Offset: 0x" << std::hex << offset << "\n"
-         << "Codebase: 0x" << std::hex << code_base;
+         << "Codebase: 0x" << std::hex << code_base << std::endl;
 #    ifndef NDEBUG
     sout << GetCurrentTraceBackString(process, frames_to_skip);
 #    endif
@@ -347,7 +347,7 @@ void WindowsCCrashHandler::HandleCommonException(HANDLE process, LPEXCEPTION_POI
     sout << "An exception has occured which was not handled!\n"
          << "Code: " << GetExceptionName(exception->ExceptionRecord->ExceptionCode) << "("
          << exception->ExceptionRecord->ExceptionCode << ")\n"
-         << "Module: " << module_name << "\n";
+         << "Module: " << module_name << std::endl;
 #    ifndef NDEBUG
     sout << GetCurrentTraceBackString(process, frames_to_skip);
 #    endif
