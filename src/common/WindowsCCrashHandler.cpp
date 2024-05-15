@@ -5,7 +5,6 @@
 #    include <new.h>     // for _set_new_handler
 #    include <psapi.h>   // for EnumProcessModules
 #    include <signal.h>  // for signal etc.
-#    include <tchar.h>   // for _T
 #endif
 
 #include <fstream>
@@ -38,7 +37,7 @@ namespace free_kick::common {
     case code:        \
         return #code;
 
-LPCSTR WindowsCCrashHandler::GetExceptionName(DWORD code)
+std::string WindowsCCrashHandler::GetExceptionName(DWORD code)
 {
     switch (code)
     {
@@ -140,7 +139,40 @@ void WindowsCCrashHandler::GetExceptionPointers(DWORD dwExceptionCode, EXCEPTION
 
 // clang-format on
 
-HMODULE WindowsCCrashHandler::GetExceptionModule(HANDLE process, LPVOID address, LPSTR module_name)
+std::string wcharToString(const wchar_t *wstr)
+{
+    if (wstr == nullptr)
+        return "";
+    // 首先计算需要的字符数量
+    int len = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, nullptr, 0, nullptr, nullptr);
+
+    // 创建一个足够大的字符数组来存储转换后的字符串
+    std::string str(len, 0);
+
+    // 执行转换
+    WideCharToMultiByte(CP_UTF8, 0, wstr, -1, &str[0], len, nullptr, nullptr);
+
+    return str;
+}
+
+std::wstring stringToWchar(const std::string &str)
+{
+    if (str.empty())
+        return L"";
+
+    // 首先计算需要的宽字符数量
+    int len = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
+
+    // 创建一个足够大的宽字符数组来存储转换后的字符串
+    std::wstring wstr(len, 0);
+
+    // 执行转换
+    MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], len);
+
+    return wstr;
+}
+
+std::string WindowsCCrashHandler::GetExceptionModule(HANDLE process, LPVOID address)
 {
     HMODULE module_list[1024];
     DWORD   size_needed = 0;
@@ -156,21 +188,25 @@ HMODULE WindowsCCrashHandler::GetExceptionModule(HANDLE process, LPVOID address,
         {
             if (cur_module == -1)
                 cur_module = i;
-            else
-            {
-                if ((DWORD)module_list[cur_module] < (DWORD)module_list[i])
-                    cur_module = i;
-            }
+            else if ((DWORD)module_list[cur_module] < (DWORD)module_list[i])
+                cur_module = i;
         }
     }
 
     if (cur_module == -1)
-        return NULL;
-
+        return "Unknown module";
+#    ifdef UNICODE
+    WCHAR module_name[MAX_PATH];
+#    else
+    CHAR module_name[MAX_PATH];
+#    endif
     if (!GetModuleFileName(module_list[cur_module], module_name, MAX_PATH))
-        return NULL;
-
-    return module_list[cur_module];
+        return "Unknown module";
+#    ifdef UNICODE
+    return wcharToString(module_name);
+#    else
+    return module_name;
+#    endif
 }
 
 std::string WindowsCCrashHandler::GetCurrentTraceBackString(HANDLE process, const ULONG frames_to_skip)
@@ -211,7 +247,8 @@ std::string WindowsCCrashHandler::GetCurrentTraceBackString(HANDLE process, cons
         bool  found_line   = SymGetLineFromAddr(process, (DWORD64)(stack_trace[i]), &displacement, &line);
         bool  found_symbol = SymFromAddr(process, (DWORD64)(stack_trace[i]), 0, symbol);
         if (found_line && found_symbol)
-            sout << "File \"" << line.FileName << "\", line " << line.LineNumber << " in " << symbol->Name << std::endl;
+            sout << "File \"" << line.FileName << "\", line " << line.LineNumber << ", in " << symbol->Name
+                 << std::endl;
         else if (found_line)
             sout << "File \"" << line.FileName << "\", line " << line.LineNumber << std::endl;
         // 清理符号缓存
@@ -233,7 +270,12 @@ void WindowsCCrashHandler::CreateMiniDump(const std::string &filename, EXCEPTION
 
     HANDLE hFile = NULL;
     // Create the minidump file
-    hFile = CreateFile(_T(filename.c_str()), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+#    ifdef UNICODE
+    std::wstring w_filename = stringToWchar(filename);
+    hFile = CreateFile(w_filename.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+#    else
+    hFile = CreateFile(filename.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+#    endif
     // Couldn't create file
     if (hFile == INVALID_HANDLE_VALUE)
         return;
@@ -257,17 +299,12 @@ void WindowsCCrashHandler::CreateMiniDump(const std::string &filename, EXCEPTION
 void WindowsCCrashHandler::HandleAccessViolation(HANDLE process, LPEXCEPTION_POINTERS exception,
                                                  const ULONG frames_to_skip)
 {
-    char  module[MAX_PATH];
-    char *module_name = NULL;
-    if (GetExceptionModule(process, exception->ExceptionRecord->ExceptionAddress, module))
-        module_name = module;
-    else
-        module_name = "Unknown module!";
+    std::string module_name = GetExceptionModule(process, exception->ExceptionRecord->ExceptionAddress);
 
     DWORD code_base = (DWORD)GetModuleHandle(NULL);
     DWORD offset    = (DWORD)exception->ExceptionRecord->ExceptionAddress - code_base;
 
-    char *access_type = NULL;
+    std::string access_type;
     switch (exception->ExceptionRecord->ExceptionInformation[0])
     {
     case 0:
@@ -286,7 +323,8 @@ void WindowsCCrashHandler::HandleAccessViolation(HANDLE process, LPEXCEPTION_POI
 
     std::ostringstream sout;
     sout << "An exception has occured which was not handled!\n"
-         << "Code: " << GetExceptionName(exception->ExceptionRecord->ExceptionCode) << "\n"
+         << "Code: " << GetExceptionName(exception->ExceptionRecord->ExceptionCode) << "("
+         << exception->ExceptionRecord->ExceptionCode << ")\n"
          << "Module: " << module_name << "\n"
          << "The thread " << GetCurrentThreadId() << " tried to " << access_type << " memory at address 0x" << std::hex
          << exception->ExceptionRecord->ExceptionInformation[1] << " which is inaccessible!\n"
@@ -303,15 +341,12 @@ void WindowsCCrashHandler::HandleAccessViolation(HANDLE process, LPEXCEPTION_POI
 void WindowsCCrashHandler::HandleCommonException(HANDLE process, LPEXCEPTION_POINTERS exception,
                                                  const ULONG frames_to_skip)
 {
-    char  module[MAX_PATH];
-    char *module_name = NULL;
-    if (GetExceptionModule(process, exception->ExceptionRecord->ExceptionAddress, module))
-        module_name = module;
-    else
-        module_name = "Unknown module!";
+    std::string module_name = GetExceptionModule(process, exception->ExceptionRecord->ExceptionAddress);
+
     std::ostringstream sout;
     sout << "An exception has occured which was not handled!\n"
-         << "Code: " << GetExceptionName(exception->ExceptionRecord->ExceptionCode) << "\n"
+         << "Code: " << GetExceptionName(exception->ExceptionRecord->ExceptionCode) << "("
+         << exception->ExceptionRecord->ExceptionCode << ")\n"
          << "Module: " << module_name << "\n";
 #    ifndef NDEBUG
     sout << GetCurrentTraceBackString(process, frames_to_skip);

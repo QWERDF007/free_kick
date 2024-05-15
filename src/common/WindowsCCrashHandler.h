@@ -26,7 +26,7 @@ private:
      * @param code 
      * @return LPCSTR 
      */
-    static LPCSTR GetExceptionName(DWORD code);
+    static std::string GetExceptionName(DWORD code);
 
     /**
      * @brief 获取异常对象指针
@@ -42,7 +42,7 @@ private:
      * @param module_name 保存模块名称的缓冲区
      * @return HMODULE 异常发生的模块句柄
      */
-    static HMODULE GetExceptionModule(HANDLE process, LPVOID address, LPSTR module_name);
+    static std::string GetExceptionModule(HANDLE process, LPVOID address);
 
     /**
      * @brief 通过 `MiniDumpWriteDump` 将用户模式小型转储信息写入指定的文件 crashdump.dmp

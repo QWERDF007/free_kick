@@ -176,7 +176,7 @@ std::string LinuxCCrashHandler::HandleCommonException(int code)
     std::string exception_name = GetExceptionName(code);
 
     sout << "An exception has occured which was not handled!\n"
-         << "Code: " << exception_name << "\nModule: " << module_name << std::endl;
+         << "Code: " << exception_name << "(" << code << ")\nModule: " << module_name << std::endl;
 
     auto traceback_msg = GetCurrentTraceBackString(4);
     sout << traceback_msg;
