@@ -23,8 +23,8 @@ private:
 
     /**
      * @brief 获取异常名称
-     * @param code 
-     * @return LPCSTR 
+     * @param code
+     * @return 异常名称
      */
     static std::string GetExceptionName(DWORD code);
 
@@ -39,8 +39,7 @@ private:
      * @brief 获取异常发生的模块名称
      * @param process 进程句柄
      * @param address 异常发生的地址
-     * @param module_name 保存模块名称的缓冲区
-     * @return HMODULE 异常发生的模块句柄
+     * @return 异常发生的模块名称
      */
     static std::string GetExceptionModule(HANDLE process, LPVOID address);
 

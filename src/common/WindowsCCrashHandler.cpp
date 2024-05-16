@@ -177,18 +177,20 @@ std::string WindowsCCrashHandler::GetExceptionModule(HANDLE process, LPVOID addr
     HMODULE module_list[1024];
     DWORD   size_needed = 0;
     if (FALSE == EnumProcessModules(process, module_list, 1024, &size_needed) || size_needed < sizeof(HMODULE))
-        return NULL;
+        return "Unknown module";
 
     int cur_module = -1;
 
     int size = (size_needed / sizeof(HMODULE));
     for (int i = 0; i < size; ++i)
     {
-        if ((DWORD)module_list[i] < (DWORD)address)
+        if (static_cast<DWORD>(reinterpret_cast<uintptr_t>(module_list[i]))
+            < static_cast<DWORD>(reinterpret_cast<uintptr_t>(address)))
         {
             if (cur_module == -1)
                 cur_module = i;
-            else if ((DWORD)module_list[cur_module] < (DWORD)module_list[i])
+            else if (static_cast<DWORD>(reinterpret_cast<uintptr_t>(module_list[cur_module]))
+                     < static_cast<DWORD>(reinterpret_cast<uintptr_t>(module_list[i])))
                 cur_module = i;
         }
     }
@@ -211,6 +213,7 @@ std::string WindowsCCrashHandler::GetExceptionModule(HANDLE process, LPVOID addr
 
 std::string WindowsCCrashHandler::GetCurrentTraceBackString(HANDLE process, const ULONG frames_to_skip)
 {
+    // https://learn.microsoft.com/en-us/windows/win32/debug/retrieving-symbol-information-by-address
     static constexpr int TRACE_STACK_LIMIT = 128;
 
     SymInitialize(process, NULL, TRUE);
@@ -218,10 +221,8 @@ std::string WindowsCCrashHandler::GetCurrentTraceBackString(HANDLE process, cons
     void *stack_trace[TRACE_STACK_LIMIT];
     ULONG frames_captured = CaptureStackBackTrace(frames_to_skip, TRACE_STACK_LIMIT, stack_trace, NULL);
 
-    SYMBOL_INFO  *symbol;
-    DWORD         sym_options;
-    IMAGEHLP_LINE line = {sizeof(IMAGEHLP_LINE)};
-
+    SYMBOL_INFO *symbol;
+    DWORD        sym_options;
     // 获取当前进程的符号选项
     sym_options = SymGetOptions();
     // 设置符号选项，确保获取源文件信息
@@ -229,12 +230,14 @@ std::string WindowsCCrashHandler::GetCurrentTraceBackString(HANDLE process, cons
     sym_options |= SYMOPT_DEBUG;
     SymSetOptions(sym_options);
 
+    IMAGEHLP_LINE line;
+    line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+
     std::ostringstream sout;
     sout << "\n\n--------------------------------------\n";
     sout << "C++ Traceback (most recent call last):";
     sout << "\n--------------------------------------\n";
 
-    // std::cerr << "\nTraceback (most recent call last): " << std::endl;
     constexpr int end_idx = 0; // 0: PrintStackTrace
     for (int i = frames_captured - 1; i >= end_idx; --i)
     {
@@ -301,8 +304,9 @@ void WindowsCCrashHandler::HandleAccessViolation(HANDLE process, LPEXCEPTION_POI
 {
     std::string module_name = GetExceptionModule(process, exception->ExceptionRecord->ExceptionAddress);
 
-    DWORD code_base = (DWORD)GetModuleHandle(NULL);
-    DWORD offset    = (DWORD)exception->ExceptionRecord->ExceptionAddress - code_base;
+    DWORD code_base = static_cast<DWORD>(reinterpret_cast<uintptr_t>(GetModuleHandle(NULL)));
+    DWORD offset
+        = static_cast<DWORD>(reinterpret_cast<uintptr_t>(exception->ExceptionRecord->ExceptionAddress)) - code_base;
 
     std::string access_type;
     switch (exception->ExceptionRecord->ExceptionInformation[0])
@@ -323,7 +327,7 @@ void WindowsCCrashHandler::HandleAccessViolation(HANDLE process, LPEXCEPTION_POI
 
     std::ostringstream sout;
     sout << "An exception has occured which was not handled!\n"
-         << "Code: " << GetExceptionName(exception->ExceptionRecord->ExceptionCode) << "("
+         << "Code: " << GetExceptionName(exception->ExceptionRecord->ExceptionCode) << "(0x" << std::hex
          << exception->ExceptionRecord->ExceptionCode << ")\n"
          << "Module: " << module_name << "\n"
          << "The thread " << GetCurrentThreadId() << " tried to " << access_type << " memory at address 0x" << std::hex
@@ -345,7 +349,7 @@ void WindowsCCrashHandler::HandleCommonException(HANDLE process, LPEXCEPTION_POI
 
     std::ostringstream sout;
     sout << "An exception has occured which was not handled!\n"
-         << "Code: " << GetExceptionName(exception->ExceptionRecord->ExceptionCode) << "("
+         << "Code: " << GetExceptionName(exception->ExceptionRecord->ExceptionCode) << "(0x" << std::hex
          << exception->ExceptionRecord->ExceptionCode << ")\n"
          << "Module: " << module_name << std::endl;
 #    ifndef NDEBUG
