@@ -16,7 +16,11 @@ if(BUILD_TESTS)
 endif()
 
 # pybind11 -----------------------------
-set(PYBIND11_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/pybind11" PARENT_SCOPE)
+# 指定 pybind11 的 python环境
+set(PYTHON_EXECUTABLE "D:/Software/anaconda3/envs/py38/python.exe")
+add_subdirectory(pybind11)
+
+# set(PYBIND11_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/pybind11" PARENT_SCOPE)
 
 # benchmark
 set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable benchmark testing.")
