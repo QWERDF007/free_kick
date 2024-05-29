@@ -1,3 +1,5 @@
+#include "CrashHandler.h"
+
 #include <pybind11/embed.h>
 #include <pybind11/pybind11.h>
 
@@ -84,10 +86,17 @@ void PythonClassObjectInstanceAndCall()
 
 int main(int argc, char *argv[])
 {
+    // free_kick::common::CrashHandler crash_handler;
+    // crash_handler.setup();
     // 设置环境变量 PYTHONHOME
-    Py_SetPythonHome(L"D:/Software/anaconda3/envs/test2");
+    // Py_SetPythonHome(L"D:/Software/anaconda3/envs/test2");
+    // py::scoped_interpreter guard{};
+    PyConfig config;
+    PyConfig_InitPythonConfig(&config);
+    PyConfig_SetBytesString(&config, &config.home, "H:/Software/Anaconda3/envs/ad");
     // 初始化Python解释器
-    py::scoped_interpreter guard{};
+    py::scoped_interpreter guard{&config};
+    PyConfig_Clear(&config);
     try
     {
         InitSysPath();
