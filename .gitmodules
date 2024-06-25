@@ -10,3 +10,7 @@
 	path = 3rdparty/benchmark
 	url = https://github.com/google/benchmark.git
 	branch = main
+[submodule "3rdparty/sqlpp11"]
+	path = 3rdparty/sqlpp11
+	url = https://github.com/rbock/sqlpp11.git
+	branch = main

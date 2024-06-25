@@ -28,3 +28,7 @@ set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "Disable benchmark install to avoid 
 if(BUILD_BENCHMARK)
     add_subdirectory(benchmark)
 endif()
+
+# sqlpp11
+set(BUILD_SQLITE3_CONNECTOR ON)
+add_subdirectory(sqlpp11)
