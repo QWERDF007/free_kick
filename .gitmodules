@@ -14,3 +14,7 @@
 	path = 3rdparty/sqlpp11
 	url = https://github.com/rbock/sqlpp11.git
 	branch = main
+[submodule "3rdparty/matplotplusplus"]
+	path = 3rdparty/matplotplusplus
+	url = https://github.com/alandefreitas/matplotplusplus.git
+	branch = master
