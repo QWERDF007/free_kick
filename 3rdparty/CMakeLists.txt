@@ -32,3 +32,6 @@ endif()
 # sqlpp11
 set(BUILD_SQLITE3_CONNECTOR ON)
 add_subdirectory(sqlpp11)
+
+# matplotplutplus
+add_subdirectory(matplotplusplus)
