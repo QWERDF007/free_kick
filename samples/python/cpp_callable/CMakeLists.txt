@@ -1,4 +1,5 @@
-set(TARGET_NAME "cpp_callable")
+
+set(TARGET_NAME "free_kick_cpp_callable")
 
 # 获取所有源文件的相对路径
 file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
@@ -13,8 +14,8 @@ add_executable(${TARGET_NAME}
     ${HEADERS}
 )
 
-target_link_libraries(${TARGET_NAME}  PRIVATE pybind11::embed)
-
-target_link_libraries(${TARGET_NAME}  PRIVATE 
+target_link_libraries(${TARGET_NAME}  
+PRIVATE 
+    pybind11::embed
     free_kick_common free_kick_common_headers
 )

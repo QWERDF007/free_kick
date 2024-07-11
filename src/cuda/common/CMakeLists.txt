@@ -6,7 +6,7 @@
 # set(PLUGIN_CU_SOURCES ${PLUGIN_CU_SOURCES} ${CU_SRCS})
 # set(PLUGIN_CU_SOURCES ${PLUGIN_CU_SOURCES} PARENT_SCOPE)
 
-set(TARGET_NAME tensorrt_common)
+set(TARGET_NAME free_kick_tensorrt_common)
 
 file(GLOB COMMON_SRCS *.cpp)
 

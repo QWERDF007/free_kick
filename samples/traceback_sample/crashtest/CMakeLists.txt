@@ -1,4 +1,4 @@
-set(TARGET_NAME "crashtest")
+set(TARGET_NAME "free_kick_crashtest")
 set(HEADER_TARGET_NAME "${TARGET_NAME}_headers")
 
 # 获取所有源文件的相对路径

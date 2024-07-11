@@ -1,4 +1,4 @@
-set(TARGET_NAME tensorrt_plugins)
+set(TARGET_NAME free_kick_tensorrt_plugins)
 set(SHARED_TARGET ${TARGET_NAME})
 set(STATIC_TARGET ${TARGET_NAME}_static)
 
@@ -40,7 +40,7 @@ target_link_libraries(${SHARED_TARGET} PUBLIC
     # CUDA::cudart
     # CUDA::nvrtc
     ${CUDNN_LIB}
-    tensorrt_common_headers
-    tensorrt_common
+    free_kick_tensorrt_common_headers
+    free_kick_tensorrt_common
 )
 

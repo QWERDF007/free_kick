@@ -1,15 +1,14 @@
+set(TARGET_NAME free_kick_qstr_test)
 file(GLOB SRCS *.cpp)
 
 
-add_executable(qstr_test
+add_executable(${TARGET_NAME}
     ${SRCS}
 )
 
-target_link_libraries(qstr_test 
+target_link_libraries(${TARGET_NAME} 
 PUBLIC
-    GTest::gtest_main
-    GTest::gmock
-    qstr_headers
+    GTest::gtest_main GTest::gmock
 PRIVATE
-    qstr qstr_headers
+    free_kick_qstr free_kick_qstr_headers
 )

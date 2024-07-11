@@ -1,4 +1,4 @@
-set(TARGET_NAME tensorrt_models_test)
+set(TARGET_NAME free_kick_tensorrt_models_test)
 
 file(GLOB SRCS *.cpp)
 
@@ -15,9 +15,7 @@ include_directories(
 
 target_link_libraries(${TARGET_NAME} 
 PUBLIC
-    GTest::gtest_main
-    GTest::gmock
-    tensorrt_models_headers
+    GTest::gtest_main GTest::gmock
 PRIVATE
-    tensorrt_models
+    free_kick_tensorrt_models free_kick_tensorrt_models_headers
 )

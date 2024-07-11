@@ -1,4 +1,4 @@
-set(TARGET_NAME tensorrt_plugins_test)
+set(TARGET_NAME free_kick_tensorrt_plugins_test)
 
 file(GLOB SRCS *.cpp)
 
@@ -17,9 +17,8 @@ target_link_libraries(${TARGET_NAME}
 PUBLIC
     GTest::gtest_main
     GTest::gmock
-    tensorrt_plugins_headers
 PRIVATE
-    tensorrt_plugins
+    free_kick_tensorrt_plugins free_kick_tensorrt_plugins_headers
 )
 
 
@@ -38,7 +37,7 @@ if(WIN32)
     
 
     # 添加自定义命令, POST_BUILD: 指定目标其他规则执行完后执行, copy: 复制, copy_if_different: 输入有变则复制
-    add_custom_command(TARGET tensorrt_plugins_test POST_BUILD
+    add_custom_command(TARGET free_kick_tensorrt_plugins_test POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
         ${TensorRT_BINS}
         "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/"

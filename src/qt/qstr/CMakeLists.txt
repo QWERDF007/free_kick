@@ -1,4 +1,4 @@
-set(TARGET_NAME qstr)
+set(TARGET_NAME free_kick_qstr)
 
 file(GLOB SOURCES *.cpp)
 file(GLOB HEADERS *.h *.hpp)

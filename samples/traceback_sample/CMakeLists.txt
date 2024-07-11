@@ -1,4 +1,4 @@
-set(TARGET_NAME "traceback_sample")
+set(TARGET_NAME "free_kick_traceback_sample")
 
 add_subdirectory(crashtest)
 
@@ -16,5 +16,5 @@ add_executable(${TARGET_NAME}
 target_link_libraries(${TARGET_NAME} 
 PRIVATE
     free_kick_common free_kick_common_headers
-    crashtest crashtest_headers
+    free_kick_crashtest free_kick_crashtest_headers
 )

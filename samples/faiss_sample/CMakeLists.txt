@@ -1,4 +1,4 @@
-set(TARGET_NAME faiss_sample)
+set(TARGET_NAME free_kick_faiss_sample)
 
 file(GLOB SRCS *.cpp)
 
