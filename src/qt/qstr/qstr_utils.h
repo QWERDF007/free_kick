@@ -4,5 +4,6 @@
 namespace free_kick::utils::qstr {
 
 QString toQString(const std::vector<double> &vec, const QString &separator = ", ");
+QString toQStringv2(const std::vector<double> &vec, const QString &separator = ", ");
 
 } // namespace free_kick::utils::qstr
