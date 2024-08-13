@@ -1,1 +1,2 @@
 add_subdirectory(nvml_sample)
+add_subdirectory(vector_add_sample)
