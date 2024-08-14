@@ -77,9 +77,25 @@ int main(int argc, char *argv[])
         }
         printf("%u. %s [%s]\n", i, name, pci.busId);
 
+        // 查询pcie
+        unsigned int pcie_gen;
+        unsigned int pcie_width, pcie_speed, pcie_tx_throughput, pcie_rx_throughput;
+        result = nvmlDeviceGetCurrPcieLinkGeneration(device, &pcie_gen);
+        result = nvmlDeviceGetCurrPcieLinkWidth(device, &pcie_width);
+        result = nvmlDeviceGetPcieSpeed(device, &pcie_speed);
+        result = nvmlDeviceGetPcieThroughput(device, NVML_PCIE_UTIL_TX_BYTES, &pcie_tx_throughput);
+        result = nvmlDeviceGetPcieThroughput(device, NVML_PCIE_UTIL_RX_BYTES, &pcie_rx_throughput);
+        if (NVML_SUCCESS != result)
+        {
+            printf("Failed to get max pcie link width or speed for device %u: %s\n", i, nvmlErrorString(result));
+            return -1;
+        }
+        printf("    PCIe Gen: %u\n    PCIe Width: %u\n    PCIe Speed: %u Mbps\n", pcie_gen, pcie_width, pcie_speed);
+        printf("    PCIe TX Throughput: %u MB/s\n    PCIe RX Throughput: %u MB/s\n", pcie_tx_throughput / 1024 / 1024,
+               pcie_rx_throughput / 1024 / 1024);
+
         // 查询显存信息
         nvmlMemory_t memory;
-        ;
         result = nvmlDeviceGetMemoryInfo(device, &memory);
         if (NVML_SUCCESS != result)
         {
@@ -102,7 +118,7 @@ int main(int argc, char *argv[])
         }
         printf("    Driver Version: %s\n", driver_version);
 
-        // 查询显卡频率
+        // 查询当前显卡频率
         unsigned int graph_clock, mem_clock;
         // result = nvmlDeviceGetApplicationsClock(device, NVML_CLOCK_GRAPHICS, &clock); // 不支持
         result = nvmlDeviceGetClockInfo(device, NVML_CLOCK_GRAPHICS, &graph_clock);
@@ -115,6 +131,28 @@ int main(int argc, char *argv[])
 
         printf("    Graphics Clock: %u MHz\n", graph_clock);
         printf("    Graphics Clock: %u MHz\n", mem_clock);
+
+        // 查询最大显卡频率
+        unsigned int max_graph_clock, max_mem_clock;
+        result = nvmlDeviceGetMaxClockInfo(device, NVML_CLOCK_GRAPHICS, &max_graph_clock);
+        result = nvmlDeviceGetMaxClockInfo(device, NVML_CLOCK_MEM, &max_mem_clock);
+        if (NVML_SUCCESS != result)
+        {
+            printf("Failed to get max clock info for device %u: %s\n", i, nvmlErrorString(result));
+            return -1;
+        }
+        printf("    Max Graphics Clock: %u MHz\n", max_graph_clock);
+        printf("    Max Memory Clock: %u MHz\n", max_mem_clock);
+
+        // 查看显卡风扇
+        unsigned int fan_speed;
+        result = nvmlDeviceGetFanSpeed(device, &fan_speed);
+        if (NVML_SUCCESS != result)
+        {
+            printf("Failed to get fan speed for device %u: %s\n", i, nvmlErrorString(result));
+            return -1;
+        }
+        printf("    Fan Speed: %u %%\n", fan_speed);
 
         // 查询显卡温度
         unsigned int temp;
