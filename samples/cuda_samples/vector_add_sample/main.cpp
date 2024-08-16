@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     cudaError_t err = cudaSuccess;
 
     // 设置矩阵大小和计算字节大小
-    int    nb_elements = 5000001;
+    int    nb_elements = 500000001;
     size_t nb_bytes    = nb_elements * sizeof(float);
     printf("[Vector addition of %d elements]\n", nb_elements);
 
