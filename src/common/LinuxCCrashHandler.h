@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
 namespace free_kick::common {
@@ -10,7 +11,9 @@ public:
     explicit LinuxCCrashHandler() = default;
     ~LinuxCCrashHandler()         = default;
 
-    void setup();
+    void setup(std::function<void()> func = nullptr);
+
+    static std::function<void()> crash_callback;
 
 private:
 #if defined(__linux__)

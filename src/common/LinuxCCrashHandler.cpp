@@ -190,13 +190,18 @@ void LinuxCCrashHandler::SingalHandler(int signal)
 {
     auto exception_msg = HandleCommonException(signal);
     std::cerr << exception_msg << std::endl;
+    if (crash_callback)
+        crash_callback();
     exit(signal);
 }
 
 #endif // __linux__
 
-void LinuxCCrashHandler::setup()
+std::function<void()> LinuxCCrashHandler::crash_callback = nullptr;
+
+void LinuxCCrashHandler::setup(std::function<void()> func)
 {
+    crash_callback = func;
 #if defined(__linux__)
     signal(SIGINT, SingalHandler); // Ctrl + C
     signal(SIGILL, SingalHandler);

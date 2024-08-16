@@ -8,6 +8,8 @@
 #    include <Windows.h>
 #endif
 
+#include <functional>
+
 namespace free_kick::common {
 
 class WindowsCCrashHandler
@@ -16,7 +18,9 @@ public:
     explicit WindowsCCrashHandler() = default;
     ~WindowsCCrashHandler()         = default;
 
-    void setup();
+    void setup(std::function<void()> func = nullptr);
+
+    static std::function<void()> crash_callback;
 
 private:
 #if defined(_WIN32)

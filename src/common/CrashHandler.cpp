@@ -8,15 +8,14 @@
 
 namespace free_kick::common {
 
-void CrashHandler::setup()
+void CrashHandler::setup(std::function<void()> crash_callback)
 {
 #if defined(_WIN32)
     WindowsCCrashHandler ccrash_handler;
-    ccrash_handler.setup();
 #else
     LinuxCCrashHandler ccrash_handler;
-    ccrash_handler.setup();
 #endif
+    ccrash_handler.setup(crash_callback);
 }
 
 } // namespace free_kick::common
