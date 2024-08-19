@@ -1,3 +1,4 @@
 add_subdirectory(nvml_sample)
 add_subdirectory(01_variable_add_sample)
-add_subdirectory(vector_add_sample)
+add_subdirectory(02_device_query_sample)
+add_subdirectory(03_vector_add_sample)
