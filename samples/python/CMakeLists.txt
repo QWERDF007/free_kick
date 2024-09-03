@@ -1,1 +1,1 @@
-add_subdirectory(cpp_callable)
+add_subdirectory(cpp_call_python_sample)

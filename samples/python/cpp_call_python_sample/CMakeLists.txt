@@ -1,5 +1,5 @@
 
-set(TARGET_NAME "free_kick_cpp_callable")
+set(TARGET_NAME "free_kick_cpp_call_python_sample")
 
 # 获取所有源文件的相对路径
 file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cpp)
