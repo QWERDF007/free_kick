@@ -1,1 +1,2 @@
 add_subdirectory(cpp_call_python_sample)
+add_subdirectory(cpp_pass_img_to_python_sample)
