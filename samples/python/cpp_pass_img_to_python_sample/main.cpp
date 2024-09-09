@@ -1,3 +1,5 @@
+#include "CrashHandler.h"
+
 #include <opencv2/highgui.hpp>
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
@@ -8,7 +10,7 @@
 #include <sstream>
 #include <type_traits>
 
-void addSysPath()
+void addSysPath(const std::string &python_home)
 {
     namespace fs = std::filesystem;
     // 获取当前工作目录
@@ -88,7 +90,7 @@ void CV8UImgTest()
 {
     const int h = 6;
     const int w = 5;
-    cv::Mat   img(h, w, CV_8UC4, cv::Scalar::all(0));
+    cv::Mat   img(h, w, CV_8UC3, cv::Scalar::all(0));
     cv::Rect  roi(1, 1, 3, 3);
     const int chs = img.channels();
     // 填充图
@@ -104,27 +106,54 @@ void CV8UImgTest()
 
     // std::cout << cv::format(img, cv::Formatter::FMT_NUMPY) << std::endl;
 
-    pybind11::module_ module = pybind11::module_::import("pass_img_test");
-    pybind11::object  func   = module.attr("pass_img_test");
-    std::cout << "full img(CV_8U): " << std::endl;
-    pybind11::object ret     = func(PythonHelper::toNumpy<uint8_t>(img));
-    cv::Mat          ret_img = PythonHelper::fromNumpy<uint8_t>(ret);
-    double           val     = cv::norm(img, ret_img, cv::NORM_INF);
-    std::cout << "norm = " << val << std::endl;
-    std::cout << pybind11::type::of(ret).attr("__name__").cast<std::string>() << std::endl;
-    std::cout << "isinstance<pybind11::array_t<uint8_t>" << pybind11::isinstance<pybind11::array_t<uint8_t>>(ret)
-              << std::endl;
-    std::cout << ret.is_none() << std::endl;
-    std::cout << std::endl;
-    std::cout << "sub img(CV_8U): " << std::endl;
-    ret     = func(PythonHelper::toNumpy<uint8_t>(img(roi)));
-    ret_img = PythonHelper::fromNumpy<uint8_t>(ret);
-    val     = cv::norm(img(roi), ret_img, cv::NORM_INF);
-    std::cout << "norm = " << val << std::endl;
-    std::cout << pybind11::type::of(ret).attr("__name__").cast<std::string>() << std::endl;
-    std::cout << pybind11::isinstance<pybind11::array_t<uint8_t>>(ret) << std::endl;
-    std::cout << ret.is_none() << std::endl;
-    std::cout << std::endl;
+    // pybind11::module_ module = pybind11::module_::import("pass_img_test");
+    // pybind11::object  func   = module.attr("pass_img_test");
+    // std::cout << "full img(CV_8U): " << std::endl;
+    // pybind11::object ret     = func(PythonHelper::toNumpy<uint8_t>(img));
+    // cv::Mat          ret_img = PythonHelper::fromNumpy<uint8_t>(ret);
+    // double           val     = cv::norm(img, ret_img, cv::NORM_INF);
+    // std::cout << "norm = " << val << std::endl;
+    // std::cout << pybind11::type::of(ret).attr("__name__").cast<std::string>() << std::endl;
+    // std::cout << "isinstance<pybind11::array_t<uint8_t>" << pybind11::isinstance<pybind11::array_t<uint8_t>>(ret)
+    //           << std::endl;
+    // std::cout << ret.is_none() << std::endl;
+    // std::cout << std::endl;
+    // std::cout << "sub img(CV_8U): " << std::endl;
+    // ret     = func(PythonHelper::toNumpy<uint8_t>(img(roi)));
+    // ret_img = PythonHelper::fromNumpy<uint8_t>(ret);
+    // val     = cv::norm(img(roi), ret_img, cv::NORM_INF);
+    // std::cout << "norm = " << val << std::endl;
+    // std::cout << pybind11::type::of(ret).attr("__name__").cast<std::string>() << std::endl;
+    // std::cout << pybind11::isinstance<pybind11::array_t<uint8_t>>(ret) << std::endl;
+    // std::cout << ret.is_none() << std::endl;
+    // std::cout << std::endl;
+    std::thread t(
+        [img]()
+        {
+            try
+            {
+                std::cout << __FUNCTION__ << " line " << __LINE__ << std::endl;
+                std::cout << "img rows = " << img.rows << ", cols = " << img.cols << std::endl;
+                pybind11::gil_scoped_acquire acquire;
+                std::cout << "get gil" << std::endl;
+                {
+                    pybind11::module_ module = pybind11::module_::import("pass_img_test");
+                    std::cout << "pass_img_test" << std::endl;
+                    pybind11::object obj = module.attr("Yolov8Detection")("F:/models/yolov8/yolov8s.pt", 640, "cuda:0");
+
+                    pybind11::object ret = obj.attr("detect")(PythonHelper::toNumpy<uint8_t>(img));
+                }
+            }
+            catch (const pybind11::error_already_set &e)
+            {
+                std::cout << "Python error: " << e.what() << std::endl;
+            }
+            catch (const std::exception &e)
+            {
+                std::cout << "std::exception: " << e.what();
+            }
+        });
+    t.join();
 }
 
 void CV32FImgTest()
@@ -172,10 +201,26 @@ void CV32FImgTest()
 
 int main(int argc, char *argv[])
 {
-    const std::string python_home = "D:/Software/anaconda3/envs/test2";
+    free_kick::common::CrashHandler crash_handler;
+    crash_handler.setup();
+
+    const std::string python_home = "D:/Software/anaconda3/envs/AD";
+    // 添加环境变量 PATH
+
+    std::string path_env = std::string(std::getenv("PATH"));
+
+    path_env = (python_home + ";" + path_env);
+    // path_env = (python_home + "/Library/mingw-w64/bin" + ";" + path_env);
+    // path_env = (python_home + "/Library/usr/bin" + ";" + path_env);
+    path_env = (python_home + "/Library/bin" + ";" + path_env);
+    // path_env = (python_home + "/Scripts" + ";" + path_env);
+    // path_env = (python_home + "/bin" + ";" + path_env);
+    _putenv_s("PATH", path_env.c_str());
+    // std::cout << "PATH = " << std::string(std::getenv("PATH")) << std::endl;
 #if (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION < 11)
     Py_SetPythonHome(Py_DecodeLocale(python_home.c_str(), nullptr));
-    pybind11::scoped_interpreter guard{};
+    pybind11::initialize_interpreter();
+    // pybind11::scoped_interpreter guard{};
 #else
     PyConfig config;
     PyConfig_InitPythonConfig(&config);
@@ -187,9 +232,11 @@ int main(int argc, char *argv[])
 #endif
     try
     {
-        addSysPath();
+        addSysPath(python_home);
+        auto gil = new pybind11::gil_scoped_release();
         CV8UImgTest();
-        CV32FImgTest();
+        delete gil;
+        // CV32FImgTest();
     }
     catch (const pybind11::error_already_set &e)
     {
