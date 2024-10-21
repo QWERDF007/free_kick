@@ -4,6 +4,7 @@
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 #include <filesystem>
 #include <iostream>
@@ -128,10 +129,11 @@ void CV8UImgTest()
     // std::cout << ret.is_none() << std::endl;
     // std::cout << std::endl;
     std::thread t(
-        [img]()
+        []()
         {
             try
             {
+                cv::Mat img = cv::imread("F:/data/VOC/VOC2007/val/images/007935.jpg");
                 std::cout << __FUNCTION__ << " line " << __LINE__ << std::endl;
                 std::cout << "img rows = " << img.rows << ", cols = " << img.cols << std::endl;
                 pybind11::gil_scoped_acquire acquire;
@@ -141,7 +143,33 @@ void CV8UImgTest()
                     std::cout << "pass_img_test" << std::endl;
                     pybind11::object obj = module.attr("Yolov8Detection")("F:/models/yolov8/yolov8s.pt", 640, "cuda:0");
 
-                    pybind11::object ret = obj.attr("detect")(PythonHelper::toNumpy<uint8_t>(img));
+                    pybind11::object ret = obj.attr("detect")(PythonHelper::toNumpy<uint8_t>(img), 0.5, 0.5);
+                    std::cout << "ret is dict: " << pybind11::isinstance<pybind11::dict>(ret) << std::endl;
+                    std::vector<float>              conf  = ret["conf"].cast<std::vector<float>>();
+                    std::vector<std::vector<float>> boxes = ret["boxes"].cast<std::vector<std::vector<float>>>();
+                    std::cout << "cls" << " ";
+                    for (auto c : ret["cls"])
+                    {
+                        std::cout << c.cast<int>() << " ";
+                    }
+                    std::cout << std::endl;
+                    std::cout << "conf ";
+                    for (auto v : conf)
+                    {
+                        std::cout << v << " ";
+                    }
+                    std::cout << std::endl;
+                    std::cout << "boxes" << " ";
+                    for (auto box : boxes)
+                    {
+                        std::cout << "[";
+                        for (auto v : box)
+                        {
+                            std::cout << v << " ";
+                        }
+                        std::cout << "] ";
+                    }
+                    std::cout << std::endl;
                 }
             }
             catch (const pybind11::error_already_set &e)
