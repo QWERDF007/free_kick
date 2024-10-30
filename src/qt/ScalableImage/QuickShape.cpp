@@ -1,5 +1,7 @@
 #include "QuickShape.h"
+
 #include <QPainter>
+
 
 QuickPen::QuickPen(QObject *parent)
     : QObject(parent)
@@ -7,9 +9,8 @@ QuickPen::QuickPen(QObject *parent)
     , color_(Qt::black)
     , valid_(false)
     , style_(Qt::PenStyle::SolidLine)
-    , joinStyle_(Qt::MiterJoin)
+    , join_style_(Qt::MiterJoin)
 {
-
 }
 
 qreal QuickPen::width() const
@@ -23,7 +24,7 @@ void QuickPen::setWidth(qreal w)
         return;
     width_ = w;
     valid_ = color_.alpha() && (qRound(width_) >= 1);
-    static_cast<QQuickItem*>(parent())->update();
+    static_cast<QQuickItem *>(parent())->update();
     emit widthChanged();
 }
 
@@ -36,7 +37,7 @@ void QuickPen::setColor(const QColor &c)
 {
     color_ = c;
     valid_ = color_.alpha() && (qRound(width_) >= 1);
-    static_cast<QQuickItem*>(parent())->update();
+    static_cast<QQuickItem *>(parent())->update();
     emit colorChanged();
 }
 
@@ -55,21 +56,21 @@ void QuickPen::setStyle(Qt::PenStyle style)
     if (style == style_)
         return;
     style_ = style;
-    static_cast<QQuickItem*>(parent())->update();
+    static_cast<QQuickItem *>(parent())->update();
     emit styleChanged();
 }
 
 Qt::PenJoinStyle QuickPen::joinStyle() const
 {
-    return joinStyle_;
+    return join_style_;
 }
 
-void QuickPen::setJoinStyle(Qt::PenJoinStyle joinStyle)
+void QuickPen::setJoinStyle(Qt::PenJoinStyle join_style)
 {
-    if (joinStyle_ == joinStyle)
+    if (join_style_ == join_style)
         return;
-    joinStyle = joinStyle;
-    static_cast<QQuickItem*>(parent())->update();
+    join_style_ = join_style;
+    static_cast<QQuickItem *>(parent())->update();
     emit styleChanged();
 }
 
@@ -77,7 +78,6 @@ QuickShape::QuickShape(QQuickItem *parent)
     : QQuickPaintedItem(parent)
     , color_(Qt::white)
 {
-
 }
 
 QColor QuickShape::color() const
@@ -94,7 +94,6 @@ void QuickShape::setColor(const QColor &c)
     emit colorChanged();
 }
 
-
 QuickPen *QuickShape::border()
 {
     if (!pen_)
@@ -102,12 +101,10 @@ QuickPen *QuickShape::border()
     return pen_;
 }
 
-
 QuickRectangle::QuickRectangle(QQuickItem *parent)
     : QuickShape(parent)
     , radius_(0)
 {
-
 }
 
 qreal QuickRectangle::radius() const
@@ -126,7 +123,6 @@ void QuickRectangle::setRadius(qreal radius)
     emit radiusChanged();
 }
 
-
 void QuickRectangle::paint(QPainter *painter)
 {
     if (antialiasing())
@@ -141,11 +137,11 @@ void QuickRectangle::paint(QPainter *painter)
         pen.setJoinStyle(pen_->joinStyle()); // 设置连接处 (拐角) 的样式
         pen.setStyle(pen_->style());
         painter->setPen(pen);
-        r = QRectF(pen_->width()/2, pen_->width()/2, width() - pen_->width(), height() - pen_->width());
+        r = QRectF(pen_->width() / 2, pen_->width() / 2, width() - pen_->width(), height() - pen_->width());
     }
     else
     {
-        r = QRectF(0,0, width(), height());
+        r = QRectF(0, 0, width(), height());
         painter->setPen(Qt::NoPen);
     }
     painter->setBrush(color());
@@ -158,7 +154,6 @@ QuickCenter::QuickCenter(QObject *parent)
     , y_(0)
     , size_(0)
 {
-
 }
 
 qreal QuickCenter::x() const
@@ -171,7 +166,7 @@ void QuickCenter::setX(qreal x)
     if (x == x_)
         return;
     x_ = x;
-    static_cast<QQuickItem*>(parent())->update();
+    static_cast<QQuickItem *>(parent())->update();
     emit xChanged();
 }
 
@@ -185,7 +180,7 @@ void QuickCenter::setY(qreal y)
     if (y == y_)
         return;
     y_ = y;
-    static_cast<QQuickItem*>(parent())->update();
+    static_cast<QQuickItem *>(parent())->update();
     emit yChanged();
 }
 
@@ -199,10 +194,9 @@ void QuickCenter::setSize(qreal size)
     if (size == size_)
         return;
     size_ = size;
-    static_cast<QQuickItem*>(parent())->update();
+    static_cast<QQuickItem *>(parent())->update();
     emit sizeChanged();
 }
-
 
 QuickCircle::QuickCircle(QQuickItem *parent)
     : QuickShape(parent)
@@ -223,8 +217,8 @@ void QuickCircle::setRadius(qreal radius)
 {
     if (radius == radius_)
         return;
-    setWidth(2*radius);
-    setHeight(2*radius);
+    setWidth(2 * radius);
+    setHeight(2 * radius);
     radius_ = radius;
     // 设置左上角的位置
     setX(center_.x() - radius_);
@@ -254,14 +248,14 @@ void QuickCircle::setCenter(const QPointF &center)
 
 bool QuickCircle::centerVisible() const
 {
-    return centerVisible_;
+    return center_visible_;
 }
 
 void QuickCircle::setCenterVisible(const bool visible)
 {
-    if (centerVisible_ == visible)
+    if (center_visible_ == visible)
         return;
-    centerVisible_ = visible;
+    center_visible_ = visible;
     update();
     emit centerVisibleChanged();
 }
@@ -285,10 +279,11 @@ void QuickCircle::paint(QPainter *painter)
         painter->setPen(Qt::NoPen);
     }
     painter->setBrush(color());
-    painter->drawEllipse(QPointF(radius_,radius_), radius_ - border()->width()/2, radius_ - border()->width()/2);
-    if (centerVisible_) {
-//        painter->setPen(Qt::NoPen);
-        painter->drawEllipse(QPointF(radius_,radius_), 3, 3);
+    painter->drawEllipse(QPointF(radius_, radius_), radius_ - border()->width() / 2, radius_ - border()->width() / 2);
+    if (center_visible_)
+    {
+        //        painter->setPen(Qt::NoPen);
+        painter->drawEllipse(QPointF(radius_, radius_), 3, 3);
     }
 }
 
@@ -310,11 +305,9 @@ void QuickCircle::updateOnYChanged()
     emit centerChanged();
 }
 
-
 QuickPolygon::QuickPolygon(QQuickItem *parent)
     : QuickShape(parent)
 {
-
 }
 
 QList<QPointF> QuickPolygon::points() const
@@ -329,8 +322,5 @@ void QuickPolygon::setPoints(const QList<QPointF> &points)
     emit pointsChanged();
 }
 
-void QuickPolygon::paint(QPainter *painter)
-{
-
-}
+void QuickPolygon::paint(QPainter *painter) {}
 
