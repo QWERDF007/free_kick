@@ -17,7 +17,7 @@ endif()
 
 # pybind11 -----------------------------
 # 指定 pybind11 的 python环境
-set(PYTHON_EXECUTABLE "D:/Software/anaconda3/envs/py38/python.exe")
+set(PYTHON_EXECUTABLE "D:/Software/anaconda3/envs/AD/python.exe")
 add_subdirectory(pybind11)
 
 # set(PYBIND11_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/pybind11" PARENT_SCOPE)
@@ -35,3 +35,6 @@ add_subdirectory(sqlpp11)
 
 # matplotplutplus
 add_subdirectory(matplotplusplus)
+
+# cppjieba
+add_subdirectory(cppjieba)

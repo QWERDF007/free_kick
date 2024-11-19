@@ -18,3 +18,7 @@
 	path = 3rdparty/matplotplusplus
 	url = https://github.com/alandefreitas/matplotplusplus.git
 	branch = master
+[submodule "3rdparty/cppjieba"]
+	path = 3rdparty/cppjieba
+	url = https://github.com/yanyiwu/cppjieba.git
+	branch = master
