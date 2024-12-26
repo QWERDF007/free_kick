@@ -22,3 +22,11 @@
 	path = 3rdparty/cppjieba
 	url = https://github.com/yanyiwu/cppjieba.git
 	branch = master
+[submodule "3rdparty/simhash-cpp"]
+	path = 3rdparty/simhash-cpp
+	url = https://github.com/seomoz/simhash-cpp.git
+	branch = master
+[submodule "3rdparty/simhash"]
+	path = 3rdparty/simhash
+	url = https://github.com/yanyiwu/simhash.git
+	branch = master
