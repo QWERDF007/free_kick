@@ -48,6 +48,7 @@ void performMorphologyTest(const cv::Mat &img, uint8_t *d_in, uint8_t *d_out, ui
     CUDA_CHECK(cudaEventRecord(ev_start, stream));
     // 注册主机内存以启用异步传输
     CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(img.data), bytes, cudaHostRegisterDefault));
+    CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(out_cuda.data), bytes, cudaHostRegisterDefault));
     // 异步传输输入数据到设备
     CUDA_CHECK(cudaEventRecord(ev_h2d_start, stream));
     CUDA_CHECK(cudaMemcpyAsync(d_in, img.data, bytes, cudaMemcpyHostToDevice, stream));
@@ -61,6 +62,7 @@ void performMorphologyTest(const cv::Mat &img, uint8_t *d_in, uint8_t *d_out, ui
     CUDA_CHECK(cudaEventRecord(ev_d2h_stop, stream));
     // 取消注册主机内存
     CUDA_CHECK(cudaHostUnregister(img.data));
+    CUDA_CHECK(cudaHostUnregister(out_cuda.data));
     CUDA_CHECK(cudaEventRecord(ev_stop, stream));
     CUDA_CHECK(cudaEventSynchronize(ev_stop));
     auto t1 = std::chrono::high_resolution_clock::now();
@@ -139,6 +141,7 @@ void performMorphologyTest(const cv::Mat &img, uint8_t *d_in, uint8_t *d_out, ui
     // 异步传输输入数据到设备
     CUDA_CHECK(cudaEventRecord(ev_h2d_start, stream));
     CUDA_CHECK(cudaMemcpyAsync(d_in, img.data, bytes, cudaMemcpyHostToDevice, stream));
+    CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(out_cuda.data), bytes, cudaHostRegisterDefault));
     CUDA_CHECK(cudaEventRecord(ev_h2d_stop, stream));
     // 执行op
     ops::morphologyEx(d_in, d_out, d_tmp, d_tmp2, img_w, img_h, img_stride, morph_op, d_se, n_offsets, se_w, se_h,
@@ -149,6 +152,7 @@ void performMorphologyTest(const cv::Mat &img, uint8_t *d_in, uint8_t *d_out, ui
     CUDA_CHECK(cudaEventRecord(ev_d2h_stop, stream));
     // 取消注册主机内存
     CUDA_CHECK(cudaHostUnregister(img.data));
+    CUDA_CHECK(cudaHostUnregister(out_cuda.data));
     CUDA_CHECK(cudaEventRecord(ev_stop, stream));
     CUDA_CHECK(cudaEventSynchronize(ev_stop));
     auto t1 = std::chrono::high_resolution_clock::now();
@@ -208,6 +212,7 @@ int main(int argc, char **argv)
         std::cerr << "Failed to load image: " << input_path << std::endl;
         return 1;
     }
+    std::cout << "img.size: " << img.size << std::endl;
     int img_w      = img.cols;
     int img_h      = img.rows;
     int img_stride = img.cols; // 我们按紧凑行存储（无 padding）
@@ -235,7 +240,8 @@ int main(int argc, char **argv)
         = free_kick::cuda::ops::v2::build_se_offsets(h_se.data(), se_w, se_h, anchor_x, anchor_y);
 
     int n_offsets = static_cast<int>(h_offsets.size());
-    std::cout << "Effective SE offsets: " << n_offsets << " out of " << n_se << std::endl;
+    std::cout << "SE size: " << n_se << std::endl;
+    std::cout << "Effective SE offsets: " << n_offsets << std::endl;
 
     int2 *d_se2 = nullptr;
     CUDA_CHECK(cudaMalloc(&d_se2, sizeof(int2) * n_offsets));
