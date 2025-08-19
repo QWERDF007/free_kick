@@ -3,6 +3,7 @@
 #include "opsdef.h"
 
 #include <cuda_runtime.h>
+#include <opencv2/opencv.hpp>
 
 #include <cstdint>
 
@@ -110,5 +111,10 @@ inline void morphBlackHat<uint8_t>(const uint8_t *d_in, uint8_t *d_tmp, uint8_t 
     morphBlackHat_u8_masked(d_in, d_tmp, d_close, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y,
                             block_dim, stream);
 }
+
+// -------------------- 统一的形态学操作接口 --------------------
+CUDA_OPS_API void morphologyEx(const uint8_t *d_in, uint8_t *d_out, uint8_t *d_tmp, uint8_t *d_tmp2, int img_w,
+                               int img_h, int img_stride, const int op, const uint8_t *d_se, int se_w, int se_h,
+                               int anchor_x, int anchor_y, dim3 block_dim, cudaStream_t stream);
 
 } // namespace free_kick::cuda::ops

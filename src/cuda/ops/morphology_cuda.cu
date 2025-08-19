@@ -122,14 +122,15 @@ __global__ void morphReduceKernelMasked(const T *__restrict__ in, T *__restrict_
 }
 
 // -------------------- 简单逐点差值核（带饱和） --------------------
-__global__ void sub_clamp_u8_kernel(const uint8_t *a, const uint8_t *b, uint8_t *c, int n)
+template<typename T, T MIN_VAL, T MAX_VAL>
+__global__ void sub_clamp_kernel(const T *a, const T *b, T *c, int n)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n)
     {
         int v = int(a[i]) - int(b[i]);
-        v     = v < 0 ? 0 : (v > 255 ? 255 : v);
-        c[i]  = static_cast<uint8_t>(v);
+        v     = v < MIN_VAL ? MIN_VAL : (v > MAX_VAL ? MAX_VAL : v);
+        c[i]  = static_cast<T>(v);
     }
 }
 
@@ -195,7 +196,7 @@ void morphTopHat_u8_masked(const uint8_t *d_in, uint8_t *d_tmp, uint8_t *d_open,
     int numel = img_h * img_stride;
     int thr   = 256;
     int bl    = divUp(numel, thr);
-    sub_clamp_u8_kernel<<<bl, thr, 0, stream>>>(d_in, d_open, d_out, numel);
+    sub_clamp_kernel<uint8_t, 0, 255><<<bl, thr, 0, stream>>>(d_in, d_open, d_out, numel);
 }
 
 void morphBlackHat_u8_masked(const uint8_t *d_in, uint8_t *d_tmp, uint8_t *d_close, uint8_t *d_out, int img_w,
@@ -209,7 +210,48 @@ void morphBlackHat_u8_masked(const uint8_t *d_in, uint8_t *d_tmp, uint8_t *d_clo
     int numel = img_h * img_stride;
     int thr   = 256;
     int bl    = divUp(numel, thr);
-    sub_clamp_u8_kernel<<<bl, thr, 0, stream>>>(d_close, d_in, d_out, numel);
+    sub_clamp_kernel<uint8_t, 0, 255><<<bl, thr, 0, stream>>>(d_close, d_in, d_out, numel);
+}
+
+typedef void (*MorphFunc)(const uint8_t *d_in, uint8_t *d_tmp, uint8_t *d_close, uint8_t *d_out, int img_w, int img_h,
+                          int img_stride, const uint8_t *d_se, int se_w, int se_h, int anchor_x, int anchor_y,
+                          dim3 block_dim, cudaStream_t stream);
+
+// -------------------- 统一的形态学操作接口实现 --------------------
+void morphologyEx(const uint8_t *d_in, uint8_t *d_out, uint8_t *d_tmp, uint8_t *d_tmp2, int img_w, int img_h,
+                  int img_stride, const int op, const uint8_t *d_se, int se_w, int se_h, int anchor_x, int anchor_y,
+                  dim3 block_dim, cudaStream_t stream)
+{
+    switch (op)
+    {
+    case cv::MORPH_DILATE:
+        morphDilate_u8_masked(d_in, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y, block_dim,
+                              stream);
+        break;
+    case cv::MORPH_ERODE:
+        morphErode_u8_masked(d_in, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y, block_dim,
+                             stream);
+        break;
+    case cv::MORPH_OPEN:
+        morphOpen_u8_masked(d_in, d_tmp, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y,
+                            block_dim, stream);
+        break;
+    case cv::MORPH_CLOSE:
+        morphClose_u8_masked(d_in, d_tmp, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y,
+                             block_dim, stream);
+        break;
+    case cv::MORPH_TOPHAT:
+        morphTopHat_u8_masked(d_in, d_tmp, d_tmp2, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x,
+                              anchor_y, block_dim, stream);
+        break;
+    case cv::MORPH_BLACKHAT:
+        morphBlackHat_u8_masked(d_in, d_tmp, d_tmp2, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x,
+                                anchor_y, block_dim, stream);
+        break;
+    default:
+        // 不支持的操作，可以抛出异常或返回错误
+        break;
+    }
 }
 
 } // namespace free_kick::cuda::ops
