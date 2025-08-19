@@ -8,6 +8,8 @@
 #include <limits>
 #include <vector>
 
+namespace free_kick::cuda::ops {
+
 // -------------------- 通用工具 --------------------
 inline static int divUp(int a, int b)
 {
@@ -327,3 +329,5 @@ void morphBlackHat_u8_masked(const uint8_t *d_in, uint8_t *d_tmp, uint8_t *d_clo
     sub_clamp_u8_kernel<<<bl, thr, 0, stream>>>(d_close, d_in, d_out, numel);
     CUDA_CHECK(cudaGetLastError());
 }
+
+} // namespace free_kick::cuda::ops

@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+namespace ops = free_kick::cuda::ops;
 
 // -------------------- 示例入口 --------------------
 int main(int argc, char **argv)
@@ -68,7 +69,7 @@ int main(int argc, char **argv)
     {
         auto t0 = std::chrono::high_resolution_clock::now();
         CUDA_CHECK(cudaEventRecord(ev_start, stream));
-        morphDilate<uint8_t>(d_in, d_out, img_w, img_h, img_stride, radius, block_dim, stream);
+        ops::morphDilate<uint8_t>(d_in, d_out, img_w, img_h, img_stride, radius, block_dim, stream);
         CUDA_CHECK(cudaEventRecord(ev_stop, stream));
         CUDA_CHECK(cudaEventSynchronize(ev_stop));
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -104,8 +105,8 @@ int main(int argc, char **argv)
         {
             auto t0 = std::chrono::high_resolution_clock::now();
             CUDA_CHECK(cudaEventRecord(ev_start, stream));
-            morphDilate_u8_masked(d_in, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y,
-                                  block_dim, stream);
+            ops::morphDilate_u8_masked(d_in, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y,
+                                       block_dim, stream);
             CUDA_CHECK(cudaEventRecord(ev_stop, stream));
             CUDA_CHECK(cudaEventSynchronize(ev_stop));
             auto t1 = std::chrono::high_resolution_clock::now();
@@ -129,7 +130,7 @@ int main(int argc, char **argv)
     {
         auto t0 = std::chrono::high_resolution_clock::now();
         CUDA_CHECK(cudaEventRecord(ev_start, stream));
-        morphErode<uint8_t>(d_in, d_out, img_w, img_h, img_stride, radius, block_dim, stream);
+        ops::morphErode<uint8_t>(d_in, d_out, img_w, img_h, img_stride, radius, block_dim, stream);
         CUDA_CHECK(cudaEventRecord(ev_stop, stream));
         CUDA_CHECK(cudaEventSynchronize(ev_stop));
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -165,8 +166,8 @@ int main(int argc, char **argv)
         {
             auto t0 = std::chrono::high_resolution_clock::now();
             CUDA_CHECK(cudaEventRecord(ev_start, stream));
-            morphErode_u8_masked(d_in, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y, block_dim,
-                                 stream);
+            ops::morphErode_u8_masked(d_in, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y,
+                                      block_dim, stream);
             CUDA_CHECK(cudaEventRecord(ev_stop, stream));
             CUDA_CHECK(cudaEventSynchronize(ev_stop));
             auto t1 = std::chrono::high_resolution_clock::now();
@@ -190,7 +191,7 @@ int main(int argc, char **argv)
     {
         auto t0 = std::chrono::high_resolution_clock::now();
         CUDA_CHECK(cudaEventRecord(ev_start, stream));
-        morphOpen<uint8_t>(d_in, d_tmp, d_out, img_w, img_h, img_stride, radius, block_dim, stream);
+        ops::morphOpen<uint8_t>(d_in, d_tmp, d_out, img_w, img_h, img_stride, radius, block_dim, stream);
         CUDA_CHECK(cudaEventRecord(ev_stop, stream));
         CUDA_CHECK(cudaEventSynchronize(ev_stop));
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -226,8 +227,8 @@ int main(int argc, char **argv)
         {
             auto t0 = std::chrono::high_resolution_clock::now();
             CUDA_CHECK(cudaEventRecord(ev_start, stream));
-            morphOpen_u8_masked(d_in, d_tmp, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y,
-                                block_dim, stream);
+            ops::morphOpen_u8_masked(d_in, d_tmp, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y,
+                                     block_dim, stream);
             CUDA_CHECK(cudaEventRecord(ev_stop, stream));
             CUDA_CHECK(cudaEventSynchronize(ev_stop));
             auto t1 = std::chrono::high_resolution_clock::now();
@@ -251,7 +252,7 @@ int main(int argc, char **argv)
     {
         auto t0 = std::chrono::high_resolution_clock::now();
         CUDA_CHECK(cudaEventRecord(ev_start, stream));
-        morphClose<uint8_t>(d_in, d_tmp, d_out, img_w, img_h, img_stride, radius, block_dim, stream);
+        ops::morphClose<uint8_t>(d_in, d_tmp, d_out, img_w, img_h, img_stride, radius, block_dim, stream);
         CUDA_CHECK(cudaEventRecord(ev_stop, stream));
         CUDA_CHECK(cudaEventSynchronize(ev_stop));
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -287,8 +288,8 @@ int main(int argc, char **argv)
         {
             auto t0 = std::chrono::high_resolution_clock::now();
             CUDA_CHECK(cudaEventRecord(ev_start, stream));
-            morphClose_u8_masked(d_in, d_tmp, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y,
-                                 block_dim, stream);
+            ops::morphClose_u8_masked(d_in, d_tmp, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x,
+                                      anchor_y, block_dim, stream);
             CUDA_CHECK(cudaEventRecord(ev_stop, stream));
             CUDA_CHECK(cudaEventSynchronize(ev_stop));
             auto t1 = std::chrono::high_resolution_clock::now();
@@ -312,7 +313,7 @@ int main(int argc, char **argv)
     {
         auto t0 = std::chrono::high_resolution_clock::now();
         CUDA_CHECK(cudaEventRecord(ev_start, stream));
-        morphTopHat<uint8_t>(d_in, d_tmp, d_tmp2, d_out, img_w, img_h, img_stride, radius, block_dim, stream);
+        ops::morphTopHat<uint8_t>(d_in, d_tmp, d_tmp2, d_out, img_w, img_h, img_stride, radius, block_dim, stream);
         CUDA_CHECK(cudaEventRecord(ev_stop, stream));
         CUDA_CHECK(cudaEventSynchronize(ev_stop));
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -348,8 +349,8 @@ int main(int argc, char **argv)
         {
             auto t0 = std::chrono::high_resolution_clock::now();
             CUDA_CHECK(cudaEventRecord(ev_start, stream));
-            morphTopHat_u8_masked(d_in, d_tmp, d_tmp2, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x,
-                                  anchor_y, block_dim, stream);
+            ops::morphTopHat_u8_masked(d_in, d_tmp, d_tmp2, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x,
+                                       anchor_y, block_dim, stream);
             CUDA_CHECK(cudaEventRecord(ev_stop, stream));
             CUDA_CHECK(cudaEventSynchronize(ev_stop));
             auto t1 = std::chrono::high_resolution_clock::now();
@@ -373,7 +374,7 @@ int main(int argc, char **argv)
     {
         auto t0 = std::chrono::high_resolution_clock::now();
         CUDA_CHECK(cudaEventRecord(ev_start, stream));
-        morphBlackHat<uint8_t>(d_in, d_tmp, d_tmp2, d_out, img_w, img_h, img_stride, radius, block_dim, stream);
+        ops::morphBlackHat<uint8_t>(d_in, d_tmp, d_tmp2, d_out, img_w, img_h, img_stride, radius, block_dim, stream);
         CUDA_CHECK(cudaEventRecord(ev_stop, stream));
         CUDA_CHECK(cudaEventSynchronize(ev_stop));
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -409,8 +410,8 @@ int main(int argc, char **argv)
         {
             auto t0 = std::chrono::high_resolution_clock::now();
             CUDA_CHECK(cudaEventRecord(ev_start, stream));
-            morphBlackHat_u8_masked(d_in, d_tmp, d_tmp2, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x,
-                                    anchor_y, block_dim, stream);
+            ops::morphBlackHat_u8_masked(d_in, d_tmp, d_tmp2, d_out, img_w, img_h, img_stride, d_se, se_w, se_h,
+                                         anchor_x, anchor_y, block_dim, stream);
             CUDA_CHECK(cudaEventRecord(ev_stop, stream));
             CUDA_CHECK(cudaEventSynchronize(ev_stop));
             auto t1 = std::chrono::high_resolution_clock::now();
