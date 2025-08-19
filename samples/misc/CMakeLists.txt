@@ -1,2 +1,3 @@
 add_subdirectory(function_register)
 add_subdirectory(deconstructor)
+add_subdirectory(vector_copy)

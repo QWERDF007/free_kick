@@ -40,7 +40,7 @@ struct MaxReducer
 {
     __device__ __forceinline__ T init() const
     {
-        return static_cast<T>(0);
+        return std::numeric_limits<T>::min();
     }
 
     __device__ __forceinline__ T reduce(T a, T b) const
@@ -54,7 +54,7 @@ struct MinReducer
 {
     __device__ __forceinline__ T init() const
     {
-        return static_cast<T>(255);
+        return std::numeric_limits<T>::max();
     }
 
     __device__ __forceinline__ T reduce(T a, T b) const
