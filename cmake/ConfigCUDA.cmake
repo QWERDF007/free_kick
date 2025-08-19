@@ -29,6 +29,9 @@ endif()
 
 set(CMAKE_CUDA_STANDARD ${CMAKE_CXX_STANDARD})
 
+# 允许在 device 侧放宽 constexpr 限制，避免对如 std::numeric_limits 的 host constexpr 报错
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr")
+
 # Compress kernels to generate smaller executables
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xfatbin=--compress-all")
 
