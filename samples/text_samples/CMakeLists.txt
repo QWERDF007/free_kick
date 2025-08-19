@@ -1,1 +1,2 @@
 add_subdirectory(01_text_segmentation_cppjieba)
+add_subdirectory(02_text_simhash)
