@@ -1,4 +1,5 @@
-
+﻿
+#include "common/utility.h"
 #include "morphology_cuda.h"
 
 #include <algorithm>
@@ -6,18 +7,6 @@
 #include <cstdio>
 #include <limits>
 #include <vector>
-
-#define CUDA_CHECK(expr)                                                                                            \
-    do                                                                                                              \
-    {                                                                                                               \
-        cudaError_t _err = (expr);                                                                                  \
-        if (_err != cudaSuccess)                                                                                    \
-        {                                                                                                           \
-            fprintf(stderr, "CUDA error %s at %s:%d -> %s\n", #expr, __FILE__, __LINE__, cudaGetErrorString(_err)); \
-            exit(1);                                                                                                \
-        }                                                                                                           \
-    }                                                                                                               \
-    while (0)
 
 // -------------------- 通用工具 --------------------
 inline static int divUp(int a, int b)

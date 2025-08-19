@@ -1,3 +1,4 @@
+﻿#include "common/utility.h"
 
 #include <cuda_runtime.h>
 #include <math.h>
@@ -5,13 +6,6 @@
 #include <stdio.h>
 
 #include <chrono>
-
-#define CUDA_CHECK_RETURN(ret)                                                                                \
-    if (ret != cudaSuccess)                                                                                   \
-    {                                                                                                         \
-        fprintf(stderr, "CUDA error: %s (%s at line %d)\n", cudaGetErrorString(ret), __FUNCTION__, __LINE__); \
-        exit(EXIT_FAILURE);                                                                                   \
-    }
 
 struct CuComplex
 {
@@ -126,18 +120,18 @@ void gpu_sample(const int DIM)
     size_t nb_bytes = img.total() * img.elemSize();
 
     unsigned char *d_img{nullptr};
-    CUDA_CHECK_RETURN(cudaMalloc((void **)&d_img, nb_bytes));
+    CUDA_CHECK(cudaMalloc((void **)&d_img, nb_bytes));
 
     // 将图像数据拷贝到设备端
-    CUDA_CHECK_RETURN(cudaMemcpy(d_img, img.data, nb_bytes, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(d_img, img.data, nb_bytes, cudaMemcpyHostToDevice));
     // 调用GPU内核
     dim3 grid(DIM, DIM);
     gpu_kernel<<<grid, 1>>>(d_img, DIM, 3);
     // 将图像数据拷贝回主机端
-    CUDA_CHECK_RETURN(cudaMemcpy(img.data, d_img, nb_bytes, cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(img.data, d_img, nb_bytes, cudaMemcpyDeviceToHost));
 
     // 释放设备端内存
-    CUDA_CHECK_RETURN(cudaFree(d_img));
+    CUDA_CHECK(cudaFree(d_img));
 
     auto end_time = std::chrono::high_resolution_clock::now();
     printf("GPU time: %f ms\n", std::chrono::duration<double, std::milli>(end_time - start_time).count());

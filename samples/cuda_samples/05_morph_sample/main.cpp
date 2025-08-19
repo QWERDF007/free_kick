@@ -1,3 +1,4 @@
+#include "common/utility.h"
 #include "morphology_cuda.h"
 
 #include <opencv2/opencv.hpp>
@@ -9,17 +10,6 @@
 #include <string>
 #include <vector>
 
-#define CUDA_CHECK(expr)                                                                                            \
-    do                                                                                                              \
-    {                                                                                                               \
-        cudaError_t _err = (expr);                                                                                  \
-        if (_err != cudaSuccess)                                                                                    \
-        {                                                                                                           \
-            fprintf(stderr, "CUDA error %s at %s:%d -> %s\n", #expr, __FILE__, __LINE__, cudaGetErrorString(_err)); \
-            exit(1);                                                                                                \
-        }                                                                                                           \
-    }                                                                                                               \
-    while (0)
 
 // -------------------- 示例入口 --------------------
 int main(int argc, char **argv)

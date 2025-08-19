@@ -1,19 +1,26 @@
-set(TARGET_NAME free_kick_cuda_ops)
+set(TARGET_NAME free_kick_cuda_common)
 
-file(GLOB SOURCES *.cpp *.cu)
-file(GLOB HEADERS *.h *.hpp)
+# 获取所有源文件的相对路径
+file(GLOB_RECURSE SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cu *.cpp)
 
-add_library(${TARGET_NAME} SHARED
+# 获取所有头文件的相对路径
+file(GLOB_RECURSE HEADERS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.h *.hpp)
+
+add_library(${TARGET_NAME} STATIC
     ${SOURCES}
     ${HEADERS}
 )
 
-target_include_directories(${TARGET_NAME} PUBLIC .)
+
+target_include_directories(${TARGET_NAME} 
+PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
 target_link_libraries(${TARGET_NAME} 
-PUBLIC
+PRIVATE
     CUDA::cudart
-    opencv_core
-    free_kick_cuda_common free_kick_cuda_common_headers
 )
 
 # 将名称转换为大写
@@ -28,5 +35,7 @@ target_compile_definitions(${TARGET_NAME} PRIVATE ${TARGET_EXPORTS})
 set(HEADER_NAME ${TARGET_NAME}_headers)
 add_library(${HEADER_NAME} INTERFACE)
 target_include_directories(${HEADER_NAME}
-    INTERFACE .
+    INTERFACE 
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_BINARY_DIR}/include
 )

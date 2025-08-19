@@ -14,6 +14,7 @@ add_executable(${TARGET_NAME}
 target_link_libraries(${TARGET_NAME}  
 PRIVATE 
     free_kick_cuda_ops free_kick_cuda_ops_headers
+    free_kick_cuda_common_headers
     ${OpenCV_LIBS}
 )
 
