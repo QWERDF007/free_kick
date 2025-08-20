@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <cuda_runtime.h>
 
@@ -62,9 +62,12 @@ __device__ __forceinline__ int clampIndex(int x, int low, int high_exclusive)
 // 无分支 clamp：使用 min/max 组合，编译为 IMNMX 指令，无 warp 分歧
 __device__ __forceinline__ int clampIndexNoBranch(int x, int low, int high_exclusive)
 {
-    x      = max(x, low); // 编译器会用 IMNMX；
+    // x      = max(x, low); // 编译器会用 IMNMX；
+    // int hi = high_exclusive - 1;
+    // x      = min(x, hi);
+    x      = (x > low ? x : low);
     int hi = high_exclusive - 1;
-    x      = min(x, hi);
+    x      = (x < hi ? x : hi);
     return x;
 }
 
