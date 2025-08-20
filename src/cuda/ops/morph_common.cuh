@@ -50,4 +50,22 @@ __global__ void sub_clamp_kernel(const T *a, const T *b, T *c, int n)
     }
 }
 
+__device__ __forceinline__ int clampIndex(int x, int low, int high_exclusive)
+{
+    if (x < low)
+        return low;
+    if (x >= high_exclusive)
+        return high_exclusive - 1;
+    return x;
+}
+
+// 无分支 clamp：使用 min/max 组合，编译为 IMNMX 指令，无 warp 分歧
+__device__ __forceinline__ int clampIndexNoBranch(int x, int low, int high_exclusive)
+{
+    x      = max(x, low); // 编译器会用 IMNMX；
+    int hi = high_exclusive - 1;
+    x      = min(x, hi);
+    return x;
+}
+
 } // namespace free_kick::cuda::ops

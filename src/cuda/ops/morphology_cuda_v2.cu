@@ -10,15 +10,6 @@
 
 namespace free_kick::cuda::ops::v2 {
 
-// 无分支 clamp：使用 min/max 组合，编译为 IMNMX 指令，无 warp 分歧
-__device__ __forceinline__ int clampIndexNoBranch(int x, int low, int high_exclusive)
-{
-    x      = max(x, low); // 编译器会用 IMNMX；
-    int hi = high_exclusive - 1;
-    x      = min(x, hi);
-    return x;
-}
-
 // -------------------- 核函数：共享内存 + Halo --------------------
 // -------------------- 核函数：带掩码的通用结构元素 --------------------
 // 结构元素 se 为大小 se_w x se_h 的二值掩码，anchor_x/anchor_y 为锚点（通常为中心）。

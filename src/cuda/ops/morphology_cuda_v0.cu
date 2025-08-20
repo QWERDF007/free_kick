@@ -1,6 +1,6 @@
 ﻿
 #include "common/utility.h"
-#include "morphology_cuda_v1.h"
+#include "morphology_cuda_v0.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -8,7 +8,9 @@
 #include <limits>
 #include <vector>
 
-namespace free_kick::cuda::ops::v1 {
+namespace free_kick::cuda::ops::v0 {
+
+// -------------------- 设备端辅助 --------------------
 
 // -------------------- 核函数：共享内存 + Halo --------------------
 // -------------------- 核函数：带掩码的通用结构元素 --------------------
@@ -19,57 +21,27 @@ __global__ void morphReduceKernelMasked(const T *__restrict__ in, T *__restrict_
                                         int img_stride, const uint8_t *__restrict__ se, int se_w, int se_h,
                                         int anchor_x, int anchor_y)
 {
-    extern __shared__ unsigned char smem_u8[];
-
-    T *smem = reinterpret_cast<T *>(smem_u8);
-
-    const int left   = anchor_x;
-    const int right  = se_w - 1 - anchor_x;
-    const int top    = anchor_y;
-    const int bottom = se_h - 1 - anchor_y;
-
-    const int tile_w = blockDim.x + left + right;
-    const int tile_h = blockDim.y + top + bottom;
-
-    const int block_x = blockIdx.x * blockDim.x;
-    const int block_y = blockIdx.y * blockDim.y;
-
-    // 共享内存加载（分块遍历）
-    for (int yy = threadIdx.y; yy < tile_h; yy += blockDim.y)
-    {
-        int      gy     = clampIndex(block_y + yy - top, 0, img_h);
-        const T *in_row = in + gy * img_stride;
-
-        for (int xx = threadIdx.x; xx < tile_w; xx += blockDim.x)
-        {
-            int gx                 = clampIndex(block_x + xx - left, 0, img_w);
-            smem[yy * tile_w + xx] = in_row[gx];
-        }
-    }
-    __syncthreads();
-
-    const int x = block_x + threadIdx.x;
-    const int y = block_y + threadIdx.y;
-
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= img_w || y >= img_h)
         return;
 
     Reducer reducer;
     T       acc = reducer.init();
 
-    // 以共享内存为中心并依据掩码进行 reduce
-    const int sx = threadIdx.x + left;
-    const int sy = threadIdx.y + top;
-
+    // 遍历 SE
     for (int ky = 0; ky < se_h; ++ky)
     {
-        const int      row    = (sy + (ky - anchor_y)) * tile_w;
+        int            iy     = clampIndex(y + ky - anchor_y, 0, img_h);
         const uint8_t *se_row = se + ky * se_w;
+
         for (int kx = 0; kx < se_w; ++kx)
         {
-            if (se_row[kx])
+            if (se_row[kx]) // SE 掩码非 0
             {
-                acc = reducer.reduce(acc, smem[row + (sx + (kx - anchor_x))]);
+                int ix  = clampIndex(x + kx - anchor_x, 0, img_w);
+                T   val = in[iy * img_stride + ix];
+                acc     = reducer.reduce(acc, val);
             }
         }
     }
@@ -82,14 +54,8 @@ void morphDilate_u8_masked(const uint8_t *d_in, uint8_t *d_out, int img_w, int i
                            const uint8_t *d_se, int se_w, int se_h, int anchor_x, int anchor_y, dim3 block_dim,
                            cudaStream_t stream)
 {
-    const int left   = anchor_x;
-    const int right  = se_w - 1 - anchor_x;
-    const int top    = anchor_y;
-    const int bottom = se_h - 1 - anchor_y;
-
-    dim3   grid_dim(divUp(img_w, block_dim.x), divUp(img_h, block_dim.y));
-    size_t smem_bytes = size_t(block_dim.x + left + right) * size_t(block_dim.y + top + bottom) * sizeof(uint8_t);
-    morphReduceKernelMasked<uint8_t, MaxReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
+    dim3 grid_dim(divUp(img_w, block_dim.x), divUp(img_h, block_dim.y));
+    morphReduceKernelMasked<uint8_t, MaxReducer<uint8_t>><<<grid_dim, block_dim, 0, stream>>>(
         d_in, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y);
 }
 
@@ -97,14 +63,8 @@ void morphErode_u8_masked(const uint8_t *d_in, uint8_t *d_out, int img_w, int im
                           const uint8_t *d_se, int se_w, int se_h, int anchor_x, int anchor_y, dim3 block_dim,
                           cudaStream_t stream)
 {
-    const int left   = anchor_x;
-    const int right  = se_w - 1 - anchor_x;
-    const int top    = anchor_y;
-    const int bottom = se_h - 1 - anchor_y;
-
-    dim3   grid_dim(divUp(img_w, block_dim.x), divUp(img_h, block_dim.y));
-    size_t smem_bytes = size_t(block_dim.x + left + right) * size_t(block_dim.y + top + bottom) * sizeof(uint8_t);
-    morphReduceKernelMasked<uint8_t, MinReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
+    dim3 grid_dim(divUp(img_w, block_dim.x), divUp(img_h, block_dim.y));
+    morphReduceKernelMasked<uint8_t, MinReducer<uint8_t>><<<grid_dim, block_dim, 0, stream>>>(
         d_in, d_out, img_w, img_h, img_stride, d_se, se_w, se_h, anchor_x, anchor_y);
 }
 
@@ -197,4 +157,4 @@ void morphologyEx(const uint8_t *d_in, uint8_t *d_out, uint8_t *d_tmp, uint8_t *
     }
 }
 
-} // namespace free_kick::cuda::ops::v1
+} // namespace free_kick::cuda::ops::v0
