@@ -2,12 +2,13 @@
 
 #include "opsdef.h"
 
-#include <cuda_runtime.h>
+#include "morph_common.cuh"
+
 #include <opencv2/opencv.hpp>
 
 #include <cstdint>
 
-namespace free_kick::cuda::ops {
+namespace free_kick::cuda::ops::v1 {
 
 // -------------------- Host 端接口声明 --------------------
 // -------------------- 带掩码结构元素的模板声明 --------------------
@@ -117,4 +118,4 @@ CUDA_OPS_API void morphologyEx(const uint8_t *d_in, uint8_t *d_out, uint8_t *d_t
                                int img_h, int img_stride, const int op, const uint8_t *d_se, int se_w, int se_h,
                                int anchor_x, int anchor_y, dim3 block_dim, cudaStream_t stream);
 
-} // namespace free_kick::cuda::ops
+} // namespace free_kick::cuda::ops::v1

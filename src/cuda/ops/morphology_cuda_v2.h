@@ -2,7 +2,8 @@
 
 #include "opsdef.h"
 
-#include <cuda_runtime.h>
+#include "morph_common.cuh"
+
 #include <opencv2/opencv.hpp>
 
 #include <cstdint>

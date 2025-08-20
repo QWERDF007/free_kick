@@ -9,51 +9,6 @@
 #include <vector>
 
 namespace free_kick::cuda::ops::v2 {
-inline static int divUp(int a, int b)
-{
-    return (a + b - 1) / b;
-}
-
-template<typename T>
-struct MaxReducer
-{
-    __device__ __forceinline__ T init() const
-    {
-        return std::numeric_limits<T>::min();
-    }
-
-    __device__ __forceinline__ T reduce(T a, T b) const
-    {
-        return a > b ? a : b;
-    }
-};
-
-template<typename T>
-struct MinReducer
-{
-    __device__ __forceinline__ T init() const
-    {
-        return std::numeric_limits<T>::max();
-    }
-
-    __device__ __forceinline__ T reduce(T a, T b) const
-    {
-        return a < b ? a : b;
-    }
-};
-
-// -------------------- 简单逐点差值核（带饱和） --------------------
-template<typename T, T MIN_VAL, T MAX_VAL>
-__global__ void sub_clamp_kernel(const T *a, const T *b, T *c, int n)
-{
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n)
-    {
-        int v = int(a[i]) - int(b[i]);
-        v     = v < MIN_VAL ? MIN_VAL : (v > MAX_VAL ? MAX_VAL : v);
-        c[i]  = static_cast<T>(v);
-    }
-}
 
 // 无分支 clamp：使用 min/max 组合，编译为 IMNMX 指令，无 warp 分歧
 __device__ __forceinline__ int clampIndexNoBranch(int x, int low, int high_exclusive)
@@ -94,18 +49,13 @@ __global__ void morphReduceKernelOffsets(const T *__restrict__ in, T *__restrict
     // 将 tile 区域加载到共享内存（无分支 clamp）
     for (int yy = threadIdx.y; yy < tile_h; yy += blockDim.y)
     {
-        int gy = block_y + yy - top;
-        gy     = max(gy, 0);
-        gy     = min(gy, img_h - 1);
+        int gy = clampIndexNoBranch(block_y + yy - top, 0, img_h);
 
         const T *in_row = in + gy * img_stride;
 
         for (int xx = threadIdx.x; xx < tile_w; xx += blockDim.x)
         {
-            int gx                 = block_x + xx - left;
-            gx                     = gx < 0 ? 0 : gx;
-            int hi_x               = img_w - 1;
-            gx                     = gx > hi_x ? hi_x : gx;
+            int gx                 = clampIndexNoBranch(block_x + xx - left, 0, img_w);
             smem[yy * tile_w + xx] = in_row[gx];
         }
     }

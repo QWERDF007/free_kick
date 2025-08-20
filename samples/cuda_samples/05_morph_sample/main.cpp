@@ -1,5 +1,5 @@
 #include "common/utility.h"
-#include "morphology_cuda.h"
+#include "morphology_cuda_v1.h"
 #include "morphology_cuda_v2.h"
 
 #include <opencv2/opencv.hpp>
@@ -21,7 +21,7 @@ void performMorphologyTest(const cv::Mat &img, uint8_t *d_in, uint8_t *d_out, ui
                            int anchor_x, int anchor_y, dim3 block_dim, cudaStream_t stream, const int morph_op,
                            const std::string &op_name, const char * /*output_dir*/)
 {
-    namespace ops = free_kick::cuda::ops;
+    namespace ops = free_kick::cuda::ops::v1;
 
     size_t bytes = size_t(img_stride) * img_h * sizeof(uint8_t);
 

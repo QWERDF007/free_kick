@@ -1,6 +1,6 @@
 ﻿
 #include "common/utility.h"
-#include "morphology_cuda.h"
+#include "morphology_cuda_v1.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -8,13 +8,7 @@
 #include <limits>
 #include <vector>
 
-namespace free_kick::cuda::ops {
-
-// -------------------- 通用工具 --------------------
-inline static int divUp(int a, int b)
-{
-    return (a + b - 1) / b;
-}
+namespace free_kick::cuda::ops::v1 {
 
 // -------------------- 设备端辅助 --------------------
 __device__ __forceinline__ int clampIndex(int x, int low, int high_exclusive)
@@ -25,34 +19,6 @@ __device__ __forceinline__ int clampIndex(int x, int low, int high_exclusive)
         return high_exclusive - 1;
     return x;
 }
-
-template<typename T>
-struct MaxReducer
-{
-    __device__ __forceinline__ T init() const
-    {
-        return std::numeric_limits<T>::min();
-    }
-
-    __device__ __forceinline__ T reduce(T a, T b) const
-    {
-        return a > b ? a : b;
-    }
-};
-
-template<typename T>
-struct MinReducer
-{
-    __device__ __forceinline__ T init() const
-    {
-        return std::numeric_limits<T>::max();
-    }
-
-    __device__ __forceinline__ T reduce(T a, T b) const
-    {
-        return a < b ? a : b;
-    }
-};
 
 // -------------------- 核函数：共享内存 + Halo --------------------
 // -------------------- 核函数：带掩码的通用结构元素 --------------------
@@ -119,19 +85,6 @@ __global__ void morphReduceKernelMasked(const T *__restrict__ in, T *__restrict_
     }
 
     out[y * img_stride + x] = acc;
-}
-
-// -------------------- 简单逐点差值核（带饱和） --------------------
-template<typename T, T MIN_VAL, T MAX_VAL>
-__global__ void sub_clamp_kernel(const T *a, const T *b, T *c, int n)
-{
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n)
-    {
-        int v = int(a[i]) - int(b[i]);
-        v     = v < MIN_VAL ? MIN_VAL : (v > MAX_VAL ? MAX_VAL : v);
-        c[i]  = static_cast<T>(v);
-    }
 }
 
 // -------------------- Host 端实现（uint8_t 专用，带掩码结构元素） --------------------
@@ -254,4 +207,4 @@ void morphologyEx(const uint8_t *d_in, uint8_t *d_out, uint8_t *d_tmp, uint8_t *
     }
 }
 
-} // namespace free_kick::cuda::ops
+} // namespace free_kick::cuda::ops::v1
