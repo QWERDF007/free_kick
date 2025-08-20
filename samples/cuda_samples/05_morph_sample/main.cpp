@@ -13,6 +13,64 @@
 #include <string>
 #include <vector>
 
+class MorphologyCudaPerformTest
+{
+public:
+    void SetUp(const cv::Mat &src)
+    {
+        test_image_ = src.clone();
+        img_w_      = test_image_.cols;
+        img_h_      = test_image_.rows;
+        img_stride_ = test_image_.step[0];
+
+        // 分配 CUDA 内存
+        size_t img_bytes = img_h_ * img_stride_;
+        CUDA_CHECK(cudaMalloc(&d_input_, img_bytes));
+        CUDA_CHECK(cudaMalloc(&d_output_, img_bytes));
+        CUDA_CHECK(cudaMalloc(&d_tmp1_, img_bytes));
+        CUDA_CHECK(cudaMalloc(&d_tmp2_, img_bytes));
+
+        // 创建 CUDA stream
+        CUDA_CHECK(cudaStreamCreate(&stream_));
+
+        // 设置默认 block 维度
+        block_dim_ = dim3(32, 16);
+    }
+
+    void TearDown()
+    {
+        if (d_input_)
+            cudaFree(d_input_);
+        if (d_output_)
+            cudaFree(d_output_);
+        if (d_tmp1_)
+            cudaFree(d_tmp1_);
+        if (d_tmp2_)
+            cudaFree(d_tmp2_);
+        if (d_se_v1_)
+            cudaFree(d_se_v1_);
+        if (d_se_v2_)
+            cudaFree(d_se_v2_);
+        if (stream_)
+            cudaStreamDestroy(stream_);
+    }
+
+protected:
+    cv::Mat  test_image_;
+    int      img_w_, img_h_, img_stride_;
+    int      se_w_, se_h_, anchor_x_, anchor_y_;
+    int      n_offsets_;
+    uint8_t *d_input_  = nullptr;
+    uint8_t *d_output_ = nullptr;
+    uint8_t *d_tmp1_   = nullptr;
+    uint8_t *d_tmp2_   = nullptr;
+    uint8_t *d_se_v1_  = nullptr;
+    int2    *d_se_v2_  = nullptr;
+
+    cudaStream_t stream_ = nullptr;
+    dim3         block_dim_;
+};
+
 namespace v1 {
 
 // 辅助函数：执行形态学操作并与OpenCV对比
