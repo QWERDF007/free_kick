@@ -16,7 +16,7 @@
 class MorphologyCudaPerformTest
 {
 public:
-    void SetUp(const cv::Mat &src, const int shape, const int kernel_size)
+    void SetUp(const cv::Mat &src)
     {
         test_image_ = src.clone();
         test_out_   = cv::Mat(test_image_.size(), CV_8UC1);
@@ -25,26 +25,25 @@ public:
         img_stride_ = test_image_.step[0];
 
         // 分配 CUDA 内存
-        size_t img_bytes = img_h_ * img_stride_;
-        CUDA_CHECK(cudaMalloc(&d_input_, img_bytes));
-        CUDA_CHECK(cudaMalloc(&d_output_, img_bytes));
-        CUDA_CHECK(cudaMalloc(&d_tmp1_, img_bytes));
-        CUDA_CHECK(cudaMalloc(&d_tmp2_, img_bytes));
+        img_bytes_ = img_h_ * img_stride_;
+        CUDA_CHECK(cudaMalloc(&d_input_, img_bytes_));
+        CUDA_CHECK(cudaMalloc(&d_output_, img_bytes_));
+        CUDA_CHECK(cudaMalloc(&d_tmp1_, img_bytes_));
+        CUDA_CHECK(cudaMalloc(&d_tmp2_, img_bytes_));
 
         // 创建 CUDA stream
         CUDA_CHECK(cudaStreamCreate(&stream_));
         // 创建 CUDA event
         CUDA_CHECK(cudaEventCreate(&ev_start));
         CUDA_CHECK(cudaEventCreate(&ev_stop));
+        CUDA_CHECK(cudaEventCreate(&ev_kernel_start));
+        CUDA_CHECK(cudaEventCreate(&ev_kernel_stop));
         CUDA_CHECK(cudaEventCreate(&ev_h2d_start));
         CUDA_CHECK(cudaEventCreate(&ev_h2d_stop));
         CUDA_CHECK(cudaEventCreate(&ev_d2h_start));
         CUDA_CHECK(cudaEventCreate(&ev_d2h_stop));
         // 设置默认 block 维度
         block_dim_ = dim3(32, 16);
-
-        // 获取结构元素 (kernel)
-        prepareStructuringElement(shape, kernel_size);
     }
 
     void TearDown()
@@ -59,6 +58,8 @@ public:
 
         CUDA_CHECK(cudaEventDestroy(ev_start));
         CUDA_CHECK(cudaEventDestroy(ev_stop));
+        CUDA_CHECK(cudaEventDestroy(ev_kernel_start));
+        CUDA_CHECK(cudaEventDestroy(ev_kernel_stop));
         CUDA_CHECK(cudaEventDestroy(ev_h2d_start));
         CUDA_CHECK(cudaEventDestroy(ev_h2d_stop));
         CUDA_CHECK(cudaEventDestroy(ev_d2h_start));
@@ -94,29 +95,52 @@ public:
         CUDA_CHECK(cudaMemcpy(d_se_v2_, offsets.data(), offsets_bytes, cudaMemcpyHostToDevice));
     }
 
-    // 计算执行时间（毫秒）, [wall, kernel, h2d, d2h]
+    template<typename Func>
+    std::vector<double> measureOpenCVExecutionTime(Func &&func)
+    {
+        float  kernel_ms = 0.0f;
+        float  cv_ms     = 0.0f;
+        float  h2d_ms    = 0.0f; // OpenCV不需要h2d传输
+        float  d2h_ms    = 0.0f; // OpenCV不需要d2h传输
+        double wall_ms   = 0.0;
+
+        auto start = std::chrono::high_resolution_clock::now();
+        func();
+        auto end  = std::chrono::high_resolution_clock::now();
+        wall_ms   = std::chrono::duration<double, std::milli>(end - start).count();
+        cv_ms     = wall_ms; // OpenCV的总CUDA时间等于wall时间
+        kernel_ms = wall_ms; // OpenCV的kernel时间等于wall时间
+
+        std::vector<double> times = {h2d_ms, d2h_ms, kernel_ms, cv_ms, wall_ms};
+        return times;
+    }
+
+    // 计算执行时间（毫秒）, [h2d, d2h, kernel, cuda_total, wall]
     template<typename Func>
     std::vector<double> measureCudaExecutionTime(Func &&func)
     {
-        float  cuda_ms = 0.0f;
-        float  h2d_ms  = 0.0f;
-        float  d2h_ms  = 0.0f;
-        double wall_ms = 0.0;
+        float  kernel_ms = 0.0f;
+        float  cuda_ms   = 0.0f;
+        float  h2d_ms    = 0.0f;
+        float  d2h_ms    = 0.0f;
+        double wall_ms   = 0.0;
 
         auto start = std::chrono::high_resolution_clock::now();
         // 事件开始
         CUDA_CHECK(cudaEventRecord(ev_start, stream_));
         // 注册主机内存以启用异步传输
-        CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(test_image_.data), bytes, cudaHostRegisterDefault));
-        CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(test_out_.data), bytes, cudaHostRegisterDefault));
+        CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(test_image_.data), img_bytes_, cudaHostRegisterDefault));
+        CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(test_out_.data), img_bytes_, cudaHostRegisterDefault));
         // 异步传输输入数据到设备, 记录事件
         CUDA_CHECK(cudaEventRecord(ev_h2d_start, stream_));
-        CUDA_CHECK(cudaMemcpyAsync(d_input_, test_image_.data, bytes, cudaMemcpyHostToDevice, stream_));
+        CUDA_CHECK(cudaMemcpyAsync(d_input_, test_image_.data, img_bytes_, cudaMemcpyHostToDevice, stream_));
         CUDA_CHECK(cudaEventRecord(ev_h2d_stop, stream_));
+        CUDA_CHECK(cudaEventRecord(ev_kernel_start, stream_));
         func();
+        CUDA_CHECK(cudaEventRecord(ev_kernel_stop, stream_));
         // 异步传输输入数据到主机
         CUDA_CHECK(cudaEventRecord(ev_d2h_start, stream_));
-        CUDA_CHECK(cudaMemcpyAsync(test_out_.data, d_output_, bytes, cudaMemcpyDeviceToHost, stream_));
+        CUDA_CHECK(cudaMemcpyAsync(test_out_.data, d_output_, img_bytes_, cudaMemcpyDeviceToHost, stream_));
         CUDA_CHECK(cudaEventRecord(ev_d2h_stop, stream_));
         // 取消注册主机内存
         CUDA_CHECK(cudaHostUnregister(test_image_.data));
@@ -129,17 +153,85 @@ public:
         wall_ms  = std::chrono::duration<double, std::milli>(end - start).count();
 
         CUDA_CHECK(cudaEventElapsedTime(&cuda_ms, ev_start, ev_stop));
+        CUDA_CHECK(cudaEventElapsedTime(&kernel_ms, ev_kernel_start, ev_kernel_stop));
         CUDA_CHECK(cudaEventElapsedTime(&h2d_ms, ev_h2d_start, ev_h2d_stop));
         CUDA_CHECK(cudaEventElapsedTime(&d2h_ms, ev_d2h_start, ev_d2h_stop));
 
-        std::vector<double> times = {wall_ms, cuda_ms, h2d_ms, d2h_ms};
+        std::vector<double> times = {h2d_ms, d2h_ms, kernel_ms, cuda_ms, wall_ms};
         return times;
+    }
+
+    void run(const int shape, const int op, const int kernel_size)
+    {
+        // 获取结构元素 (kernel)
+        prepareStructuringElement(shape, kernel_size);
+
+        auto cv_times
+            = measureOpenCVExecutionTime([this, op] { cv::morphologyEx(test_image_, test_out_, op, kernel_); });
+
+        auto cuda_v1_times = measureCudaExecutionTime(
+            [this, op]
+            {
+                free_kick::cuda::ops::v1::morphologyEx(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                       img_stride_, op, d_se_v1_, se_w_, se_h_, anchor_x_, anchor_y_,
+                                                       block_dim_, stream_);
+            });
+
+        auto cuda_v2_times = measureCudaExecutionTime(
+            [this, op]
+            {
+                free_kick::cuda::ops::v2::morphologyEx(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                       img_stride_, op, d_se_v2_, n_offsets_, se_w_, se_h_, anchor_x_,
+                                                       anchor_y_, block_dim_, stream_);
+            });
+
+        // 获取操作名称
+        std::string op_name;
+        switch (op)
+        {
+        case cv::MORPH_DILATE:
+            op_name = "DILATE";
+            break;
+        case cv::MORPH_ERODE:
+            op_name = "ERODE";
+            break;
+        case cv::MORPH_OPEN:
+            op_name = "OPEN";
+            break;
+        case cv::MORPH_CLOSE:
+            op_name = "CLOSE";
+            break;
+        default:
+            op_name = "UNKNOWN";
+            break;
+        }
+
+        std::vector<std::pair<std::string, std::vector<double>>> names_times{
+            {"cv",      cv_times},
+            {"v1", cuda_v1_times},
+            {"v2", cuda_v2_times},
+        };
+
+        // 提取时间数据 [h2d_ms, d2h_ms, kernel_ms, cuda_total_ms, wall_ms]
+        const size_t last         = cv_times.size() - 1;
+        double       cv_wall_time = cv_times[last];
+
+        // 打印格式化输出
+
+        std::cout << std::fixed << std::setprecision(3);
+        for (const auto &[name, times] : names_times)
+        {
+            double scale = cv_wall_time / (times[last] + 1e-9);
+            std::cout << "| " << op_name << " | " << name << " | " << times[0] << " | " << times[1] << " | " << times[2]
+                      << " | " << times[3] << " | " << times[4] << " | " << scale << "x |" << std::endl;
+        }
     }
 
 protected:
     cv::Mat  test_image_;
     cv::Mat  test_out_;
     cv::Mat  kernel_;
+    size_t   img_bytes_;
     int      img_w_, img_h_, img_stride_;
     int      se_w_, se_h_, anchor_x_, anchor_y_;
     int      n_offsets_;
@@ -152,6 +244,7 @@ protected:
 
     // CUDA 事件计时器
     cudaEvent_t ev_start, ev_stop;
+    cudaEvent_t ev_kernel_start, ev_kernel_stop;
     cudaEvent_t ev_h2d_start, ev_h2d_stop;
     cudaEvent_t ev_d2h_start, ev_d2h_stop;
 
@@ -159,197 +252,10 @@ protected:
     dim3         block_dim_;
 };
 
-namespace v1 {
-
-// 辅助函数：执行形态学操作并与OpenCV对比
-void performMorphologyTest(const cv::Mat &img, uint8_t *d_in, uint8_t *d_out, uint8_t *d_tmp, uint8_t *d_tmp2,
-                           int img_w, int img_h, int img_stride, const cv::Mat &se, uint8_t *d_se, int se_w, int se_h,
-                           int anchor_x, int anchor_y, dim3 block_dim, cudaStream_t stream, const int morph_op,
-                           const std::string &op_name, const char * /*output_dir*/)
-{
-    namespace ops = free_kick::cuda::ops::v1;
-
-    size_t bytes = size_t(img_stride) * img_h * sizeof(uint8_t);
-
-    cv::Mat out_cuda(img_h, img_w, CV_8UC1);
-    cv::Mat out_cv;
-
-    // CUDA 事件计时器
-    cudaEvent_t ev_start, ev_stop;
-    cudaEvent_t ev_h2d_start, ev_h2d_stop;
-    cudaEvent_t ev_d2h_start, ev_d2h_stop;
-    CUDA_CHECK(cudaEventCreate(&ev_start));
-    CUDA_CHECK(cudaEventCreate(&ev_stop));
-    CUDA_CHECK(cudaEventCreate(&ev_h2d_start));
-    CUDA_CHECK(cudaEventCreate(&ev_h2d_stop));
-    CUDA_CHECK(cudaEventCreate(&ev_d2h_start));
-    CUDA_CHECK(cudaEventCreate(&ev_d2h_stop));
-
-    // CUDA 操作
-    float  cuda_ms = 0.0f;
-    float  h2d_ms  = 0.0f;
-    float  d2h_ms  = 0.0f;
-    double wall_ms = 0.0;
-    auto   t0      = std::chrono::high_resolution_clock::now();
-    CUDA_CHECK(cudaEventRecord(ev_start, stream));
-    // 注册主机内存以启用异步传输
-    CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(img.data), bytes, cudaHostRegisterDefault));
-    CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(out_cuda.data), bytes, cudaHostRegisterDefault));
-    // 异步传输输入数据到设备
-    CUDA_CHECK(cudaEventRecord(ev_h2d_start, stream));
-    CUDA_CHECK(cudaMemcpyAsync(d_in, img.data, bytes, cudaMemcpyHostToDevice, stream));
-    CUDA_CHECK(cudaEventRecord(ev_h2d_stop, stream));
-    // 执行op
-    ops::morphologyEx(d_in, d_out, d_tmp, d_tmp2, img_w, img_h, img_stride, morph_op, d_se, se_w, se_h, anchor_x,
-                      anchor_y, block_dim, stream);
-    // 异步传输输入数据到主机
-    CUDA_CHECK(cudaEventRecord(ev_d2h_start, stream));
-    CUDA_CHECK(cudaMemcpyAsync(out_cuda.data, d_out, bytes, cudaMemcpyDeviceToHost, stream));
-    CUDA_CHECK(cudaEventRecord(ev_d2h_stop, stream));
-    // 取消注册主机内存
-    CUDA_CHECK(cudaHostUnregister(img.data));
-    CUDA_CHECK(cudaHostUnregister(out_cuda.data));
-    CUDA_CHECK(cudaEventRecord(ev_stop, stream));
-    CUDA_CHECK(cudaEventSynchronize(ev_stop));
-    auto t1 = std::chrono::high_resolution_clock::now();
-    CUDA_CHECK(cudaEventElapsedTime(&cuda_ms, ev_start, ev_stop));
-    CUDA_CHECK(cudaEventElapsedTime(&h2d_ms, ev_h2d_start, ev_h2d_stop));
-    CUDA_CHECK(cudaEventElapsedTime(&d2h_ms, ev_d2h_start, ev_d2h_stop));
-    wall_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-
-    // OpenCV 操作
-
-    auto t0_cv = std::chrono::high_resolution_clock::now();
-    cv::morphologyEx(img, out_cv, morph_op, se, cv::Point(-1, -1), 1, cv::BORDER_REPLICATE);
-    auto   t1_cv = std::chrono::high_resolution_clock::now();
-    double cv_ms = std::chrono::duration<double, std::milli>(t1_cv - t0_cv).count();
-
-    // 对比结果
-    cv::Mat diff;
-    cv::absdiff(out_cuda, out_cv, diff);
-    double minv = 0.0, maxv = 0.0;
-    cv::minMaxLoc(diff, &minv, &maxv);
-    int nz = cv::countNonZero(diff);
-
-    CUDA_CHECK(cudaEventDestroy(ev_start));
-    CUDA_CHECK(cudaEventDestroy(ev_stop));
-    CUDA_CHECK(cudaEventDestroy(ev_h2d_start));
-    CUDA_CHECK(cudaEventDestroy(ev_h2d_stop));
-    CUDA_CHECK(cudaEventDestroy(ev_d2h_start));
-    CUDA_CHECK(cudaEventDestroy(ev_d2h_stop));
-
-    // 保存结果
-    // std::string base = std::string(output_dir) + "/" + op_name;
-    // cv::imwrite(base + "_cuda.png", out_cuda);
-    // cv::imwrite(base + "_cv.png", out_cv);
-
-    std::cout << "v1 " << std::setw(10) << std::left << op_name << ": cuda=" << std::fixed << std::setprecision(3)
-              << cuda_ms << " ms (event), wall=" << wall_ms << " ms, h2d=" << h2d_ms << " ms, d2h=" << d2h_ms
-              << " ms, kernel_time=" << cuda_ms - h2d_ms - d2h_ms << " ms, opencv=" << cv_ms
-              << " ms, max_abs_diff=" << std::setprecision(0) << maxv << ", nonzero=" << nz << std::endl;
-}
-
-} // namespace v1
-
-namespace v2 {
-void performMorphologyTest(const cv::Mat &img, uint8_t *d_in, uint8_t *d_out, uint8_t *d_tmp, uint8_t *d_tmp2,
-                           int img_w, int img_h, int img_stride, const cv::Mat &se, int2 *d_se, int n_offsets, int se_w,
-                           int se_h, int anchor_x, int anchor_y, dim3 block_dim, cudaStream_t stream,
-                           const int morph_op, const std::string &op_name, const char * /*output_dir*/)
-{
-    namespace ops = free_kick::cuda::ops::v2;
-
-    size_t bytes = size_t(img_stride) * img_h * sizeof(uint8_t);
-
-    cv::Mat out_cuda(img_h, img_w, CV_8UC1);
-    cv::Mat out_cv;
-
-    // CUDA 事件计时器
-    cudaEvent_t ev_start, ev_stop;
-    cudaEvent_t ev_h2d_start, ev_h2d_stop;
-    cudaEvent_t ev_d2h_start, ev_d2h_stop;
-    CUDA_CHECK(cudaEventCreate(&ev_start));
-    CUDA_CHECK(cudaEventCreate(&ev_stop));
-    CUDA_CHECK(cudaEventCreate(&ev_h2d_start));
-    CUDA_CHECK(cudaEventCreate(&ev_h2d_stop));
-    CUDA_CHECK(cudaEventCreate(&ev_d2h_start));
-    CUDA_CHECK(cudaEventCreate(&ev_d2h_stop));
-
-    // CUDA 操作
-    float  cuda_ms = 0.0f;
-    float  h2d_ms  = 0.0f;
-    float  d2h_ms  = 0.0f;
-    double wall_ms = 0.0;
-    auto   t0      = std::chrono::high_resolution_clock::now();
-    CUDA_CHECK(cudaEventRecord(ev_start, stream));
-    // 注册主机内存以启用异步传输
-    CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(img.data), bytes, cudaHostRegisterDefault));
-    // 异步传输输入数据到设备
-    CUDA_CHECK(cudaEventRecord(ev_h2d_start, stream));
-    CUDA_CHECK(cudaMemcpyAsync(d_in, img.data, bytes, cudaMemcpyHostToDevice, stream));
-    CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(out_cuda.data), bytes, cudaHostRegisterDefault));
-    CUDA_CHECK(cudaEventRecord(ev_h2d_stop, stream));
-    // 执行op
-    ops::morphologyEx(d_in, d_out, d_tmp, d_tmp2, img_w, img_h, img_stride, morph_op, d_se, n_offsets, se_w, se_h,
-                      anchor_x, anchor_y, block_dim, stream);
-    // 异步传输输入数据到主机
-    CUDA_CHECK(cudaEventRecord(ev_d2h_start, stream));
-    CUDA_CHECK(cudaMemcpyAsync(out_cuda.data, d_out, bytes, cudaMemcpyDeviceToHost, stream));
-    CUDA_CHECK(cudaEventRecord(ev_d2h_stop, stream));
-    // 取消注册主机内存
-    CUDA_CHECK(cudaHostUnregister(img.data));
-    CUDA_CHECK(cudaHostUnregister(out_cuda.data));
-    CUDA_CHECK(cudaEventRecord(ev_stop, stream));
-    CUDA_CHECK(cudaEventSynchronize(ev_stop));
-    auto t1 = std::chrono::high_resolution_clock::now();
-    CUDA_CHECK(cudaEventElapsedTime(&cuda_ms, ev_start, ev_stop));
-    CUDA_CHECK(cudaEventElapsedTime(&h2d_ms, ev_h2d_start, ev_h2d_stop));
-    CUDA_CHECK(cudaEventElapsedTime(&d2h_ms, ev_d2h_start, ev_d2h_stop));
-    wall_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-
-    // OpenCV 操作
-    auto t0_cv = std::chrono::high_resolution_clock::now();
-    cv::morphologyEx(img, out_cv, morph_op, se, cv::Point(-1, -1), 1, cv::BORDER_REPLICATE);
-    auto   t1_cv = std::chrono::high_resolution_clock::now();
-    double cv_ms = std::chrono::duration<double, std::milli>(t1_cv - t0_cv).count();
-
-    // 对比结果
-    cv::Mat diff;
-    cv::absdiff(out_cuda, out_cv, diff);
-    double minv = 0.0, maxv = 0.0;
-    cv::minMaxLoc(diff, &minv, &maxv);
-    int nz = cv::countNonZero(diff);
-
-    CUDA_CHECK(cudaEventDestroy(ev_start));
-    CUDA_CHECK(cudaEventDestroy(ev_stop));
-    CUDA_CHECK(cudaEventDestroy(ev_h2d_start));
-    CUDA_CHECK(cudaEventDestroy(ev_h2d_stop));
-    CUDA_CHECK(cudaEventDestroy(ev_d2h_start));
-    CUDA_CHECK(cudaEventDestroy(ev_d2h_stop));
-
-    // 保存结果
-    // std::string base = std::string(output_dir) + "/" + op_name;
-    // cv::imwrite(base + "_cuda.png", out_cuda);
-    // cv::imwrite(base + "_cv.png", out_cv);
-
-    std::cout << "v2 " << std::setw(10) << std::left << op_name << ": cuda=" << std::fixed << std::setprecision(3)
-              << cuda_ms << " ms (event), wall=" << wall_ms << " ms, h2d=" << h2d_ms << " ms, d2h=" << d2h_ms
-              << " ms, kernel_time=" << cuda_ms - h2d_ms - d2h_ms << " ms, opencv=" << cv_ms
-              << " ms, max_abs_diff=" << std::setprecision(0) << maxv << ", nonzero=" << nz << std::endl;
-}
-
-} // namespace v2
-
-// -------------------- 示例入口 --------------------
 int main(int argc, char **argv)
 {
     const char *input_path  = (argc > 1) ? argv[1] : "input.png";
-    const char *output_dir  = (argc > 2) ? argv[2] : "./out";
-    int         kernel_size = (argc > 3) ? std::max(0, atoi(argv[3])) : 2; // 结构元素半径
-    dim3        block_dim(32, 16);                                         // 可根据显卡调优
-
-    cudaStream_t stream;
-    CUDA_CHECK(cudaStreamCreate(&stream));
+    int         kernel_size = (argc > 2) ? std::max(1, atoi(argv[2])) : 3; // 结构元素大小
 
     // 读入灰度图
     cv::Mat img = cv::imread(input_path, cv::IMREAD_GRAYSCALE);
@@ -358,77 +264,19 @@ int main(int argc, char **argv)
         std::cerr << "Failed to load image: " << input_path << std::endl;
         return 1;
     }
-    std::cout << "img.size: " << img.size << std::endl;
-    int img_w      = img.cols;
-    int img_h      = img.rows;
-    int img_stride = img.cols; // 我们按紧凑行存储（无 padding）
+    MorphologyCudaPerformTest runner;
+    runner.SetUp(img);
+    // std::vector<int> shapes     = {cv::MORPH_RECT, cv::MORPH_CROSS, cv::MORPH_ELLIPSE};
+    std::vector<int> operations = {cv::MORPH_DILATE, cv::MORPH_ERODE, cv::MORPH_OPEN, cv::MORPH_CLOSE};
 
-    // 使用 OpenCV 的结构元素（矩形，与 CUDA 方形半径匹配），并拷贝到 GPU 端用于“带掩码”的 CUDA 算子
-    int      ksz      = kernel_size / 2 * 2 + 1;
-    cv::Mat  se       = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(ksz, ksz));
-    int      se_w     = se.cols;
-    int      se_h     = se.rows;
-    int      anchor_x = se_w / 2;
-    int      anchor_y = se_h / 2;
-    int      n_se     = se_w * se_h;
-    uint8_t *d_se     = nullptr;
-    size_t   se_bytes = static_cast<size_t>(se_w * se_h) * sizeof(uint8_t);
-    CUDA_CHECK(cudaMalloc(&d_se, se_bytes));
-    CUDA_CHECK(cudaMemcpy(d_se, se.data, se_bytes, cudaMemcpyHostToDevice));
+    std::cout << "Image size: " << img.size << std::endl;
+    std::cout << "| OP | version | h2d time | d2h time | kernel time | cuda time | wall time | Speed up |" << std::endl;
+    std::cout << "| ---- | ---- | ---- |---- | ---- | ---- | ---- | ---- |" << std::endl;
 
-    // 将结构元素数据转换为正确的格式并构建偏移列表
-    std::vector<uint8_t> h_se(n_se);
-    for (int i = 0; i < n_se; ++i)
+    for (int op : operations)
     {
-        h_se[i] = se.data[i];
+        runner.run(cv::MORPH_ELLIPSE, op, kernel_size);
     }
-    std::vector<int2> h_offsets
-        = free_kick::cuda::ops::v2::build_se_offsets(h_se.data(), se_w, se_h, anchor_x, anchor_y);
-
-    int n_offsets = static_cast<int>(h_offsets.size());
-    std::cout << "SE size: " << n_se << std::endl;
-    std::cout << "Effective SE offsets: " << n_offsets << std::endl;
-
-    int2 *d_se2 = nullptr;
-    CUDA_CHECK(cudaMalloc(&d_se2, sizeof(int2) * n_offsets));
-    CUDA_CHECK(cudaMemcpy(d_se2, h_offsets.data(), sizeof(int2) * n_offsets, cudaMemcpyHostToDevice));
-
-    std::cout << "se.size: " << se.size << std::endl;
-
-    // 分配 GPU 内存
-    size_t   bytes = size_t(img_stride) * img_h * sizeof(uint8_t);
-    uint8_t *d_in = nullptr, *d_out = nullptr, *d_tmp = nullptr, *d_tmp2 = nullptr;
-    CUDA_CHECK(cudaMalloc(&d_in, bytes));
-    CUDA_CHECK(cudaMalloc(&d_out, bytes));
-    CUDA_CHECK(cudaMalloc(&d_tmp, bytes));
-    CUDA_CHECK(cudaMalloc(&d_tmp2, bytes));
-
-    // CUDA_CHECK(cudaMemcpy(d_in, img.data, bytes, cudaMemcpyHostToDevice));
-
-    // 依次对比六种操作（CUDA vs OpenCV）
-    std::vector<std::pair<int, std::string>> ops = {
-        {   cv::MORPH_ERODE,    "erode"},
-        {  cv::MORPH_DILATE,   "dilate"},
-        {    cv::MORPH_OPEN,     "open"},
-        {   cv::MORPH_CLOSE,    "close"},
-
-        {  cv::MORPH_TOPHAT,   "tophat"},
-        {cv::MORPH_BLACKHAT, "blackhat"},
-    };
-    for (const auto &[op, name] : ops)
-    {
-        v1::performMorphologyTest(img, d_in, d_out, d_tmp, d_tmp2, img_w, img_h, img_stride, se, d_se, se_w, se_h,
-                                  anchor_x, anchor_y, block_dim, stream, op, name, output_dir);
-        v2::performMorphologyTest(img, d_in, d_out, d_tmp, d_tmp2, img_w, img_h, img_stride, se, d_se2, n_offsets, se_w,
-                                  se_h, anchor_x, anchor_y, block_dim, stream, op, name, output_dir);
-    }
-
-    CUDA_CHECK(cudaFree(d_in));
-    CUDA_CHECK(cudaFree(d_out));
-    CUDA_CHECK(cudaFree(d_tmp));
-    CUDA_CHECK(cudaFree(d_tmp2));
-    CUDA_CHECK(cudaFree(d_se));
-    CUDA_CHECK(cudaFree(d_se2));
-    printf("Done.\n");
+    runner.TearDown();
     return 0;
 }
