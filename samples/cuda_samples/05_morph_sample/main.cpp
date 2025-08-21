@@ -126,11 +126,11 @@ public:
         double wall_ms   = 0.0;
 
         auto start = std::chrono::high_resolution_clock::now();
-        // 事件开始
-        CUDA_CHECK(cudaEventRecord(ev_start, stream_));
-        // 注册主机内存以启用异步传输
+        // 注册主机内存以启用异步传输（在计时之外）
         CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(test_image_.data), img_bytes_, cudaHostRegisterDefault));
         CUDA_CHECK(cudaHostRegister(const_cast<uint8_t *>(test_out_.data), img_bytes_, cudaHostRegisterDefault));
+        // 事件开始
+        CUDA_CHECK(cudaEventRecord(ev_start, stream_));
         // 异步传输输入数据到设备, 记录事件
         CUDA_CHECK(cudaEventRecord(ev_h2d_start, stream_));
         CUDA_CHECK(cudaMemcpyAsync(d_input_, test_image_.data, img_bytes_, cudaMemcpyHostToDevice, stream_));
@@ -142,12 +142,12 @@ public:
         CUDA_CHECK(cudaEventRecord(ev_d2h_start, stream_));
         CUDA_CHECK(cudaMemcpyAsync(test_out_.data, d_output_, img_bytes_, cudaMemcpyDeviceToHost, stream_));
         CUDA_CHECK(cudaEventRecord(ev_d2h_stop, stream_));
-        // 取消注册主机内存
-        CUDA_CHECK(cudaHostUnregister(test_image_.data));
-        CUDA_CHECK(cudaHostUnregister(test_out_.data));
         // 事件结束, 等待同步
         CUDA_CHECK(cudaEventRecord(ev_stop, stream_));
         CUDA_CHECK(cudaEventSynchronize(ev_stop));
+        // 取消注册主机内存（在计时之外）
+        CUDA_CHECK(cudaHostUnregister(test_image_.data));
+        CUDA_CHECK(cudaHostUnregister(test_out_.data));
 
         auto end = std::chrono::high_resolution_clock::now();
         wall_ms  = std::chrono::duration<double, std::milli>(end - start).count();
