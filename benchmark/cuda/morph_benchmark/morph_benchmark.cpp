@@ -54,6 +54,10 @@ MorphBenchmarkData::~MorphBenchmarkData()
     cudaFree(d_output);
     cudaFree(d_tmp1);
     cudaFree(d_tmp2);
+    if (d_se_v1)
+        cudaFree(d_se_v1);
+    if (d_se_v2)
+        cudaFree(d_se_v2);
 }
 
 void MorphBenchmarkData::getStructuringElement()
@@ -75,7 +79,7 @@ void MorphBenchmarkData::getStructuringElement()
 
     // 为 v2 准备（构建偏移列表）
     auto offsets = free_kick::cuda::ops::v2::build_se_offsets(kernel.data, se_w, se_h, anchor_x, anchor_y);
-    n_offsets    = offsets.size();
+    n_offsets    = static_cast<int>(offsets.size());
 
     if (d_se_v2)
         cudaFree(d_se_v2);
@@ -392,10 +396,6 @@ void BM_OpenCV_Open(benchmark::State &state)
     {
         cv::morphologyEx(data.test_image, data.output_image, cv::MORPH_OPEN, data.kernel, anchor);
     }
-
-    double pixels_processed      = static_cast<double>(data.width * data.height);
-    state.counters["pixels/sec"] = benchmark::Counter(pixels_processed, benchmark::Counter::kIsRate);
-    state.counters["MPix/sec"]   = benchmark::Counter(pixels_processed / 1e6, benchmark::Counter::kIsRate);
 }
 
 void BM_OpenCV_Close(benchmark::State &state)
