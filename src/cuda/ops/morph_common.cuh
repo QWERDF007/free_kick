@@ -2,6 +2,8 @@
 
 #include <cuda_runtime.h>
 
+#include <limits>
+
 namespace free_kick::cuda::ops {
 
 template<typename T>

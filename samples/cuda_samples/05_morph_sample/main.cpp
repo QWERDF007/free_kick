@@ -1,6 +1,6 @@
 #include "common/utility.h"
-#include "morphology_cuda_v1.h"
-#include "morphology_cuda_v2.h"
+
+#include "morphology_unified.cuh"
 
 #include <opencv2/opencv.hpp>
 
@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+using namespace free_kick::cuda::ops::unified;
+
 class MorphologyCudaPerformTest
 {
 public:
@@ -22,7 +24,7 @@ public:
         test_out_   = cv::Mat(test_image_.size(), CV_8UC1);
         img_w_      = test_image_.cols;
         img_h_      = test_image_.rows;
-        img_stride_ = test_image_.step[0];
+        img_stride_ = static_cast<int>(test_image_.step[0]);
 
         // 分配 CUDA 内存
         img_bytes_ = img_h_ * img_stride_;
@@ -52,8 +54,7 @@ public:
         CUDA_CHECK(cudaFree(d_output_));
         CUDA_CHECK(cudaFree(d_tmp1_));
         CUDA_CHECK(cudaFree(d_tmp2_));
-        CUDA_CHECK(cudaFree(d_se_v1_));
-        CUDA_CHECK(cudaFree(d_se_v2_));
+        CUDA_CHECK(cudaFree(d_se_mask_));
         CUDA_CHECK(cudaStreamDestroy(stream_));
 
         CUDA_CHECK(cudaEventDestroy(ev_start));
@@ -66,7 +67,7 @@ public:
         CUDA_CHECK(cudaEventDestroy(ev_d2h_stop));
     }
 
-    // 准备结构元素（为 v1 和 v2 版本）
+    // 准备结构元素（为统一接口）
     void prepareStructuringElement(const int shape, const int kernel_size)
     {
         const int ksz = kernel_size / 2 * 2 + 1;
@@ -77,22 +78,12 @@ public:
         anchor_x_ = se_w_ / 2;
         anchor_y_ = se_h_ / 2;
 
-        // 为 v1 准备（直接复制掩码）
-        if (d_se_v1_)
-            cudaFree(d_se_v1_);
+        // 为统一接口准备设备端结构元素掩码
+        if (d_se_mask_)
+            cudaFree(d_se_mask_);
         size_t se_bytes = se_w_ * se_h_ * sizeof(uint8_t);
-        CUDA_CHECK(cudaMalloc(&d_se_v1_, se_bytes));
-        CUDA_CHECK(cudaMemcpy(d_se_v1_, kernel_.data, se_bytes, cudaMemcpyHostToDevice));
-
-        // 为 v2 准备（构建偏移列表）
-        auto offsets = free_kick::cuda::ops::v2::build_se_offsets(kernel_.data, se_w_, se_h_, anchor_x_, anchor_y_);
-        n_offsets_   = offsets.size();
-
-        if (d_se_v2_)
-            cudaFree(d_se_v2_);
-        size_t offsets_bytes = n_offsets_ * sizeof(int2);
-        CUDA_CHECK(cudaMalloc(&d_se_v2_, offsets_bytes));
-        CUDA_CHECK(cudaMemcpy(d_se_v2_, offsets.data(), offsets_bytes, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMalloc(&d_se_mask_, se_bytes));
+        CUDA_CHECK(cudaMemcpy(d_se_mask_, kernel_.data, se_bytes, cudaMemcpyHostToDevice));
     }
 
     template<typename Func>
@@ -108,8 +99,8 @@ public:
         func();
         auto end  = std::chrono::high_resolution_clock::now();
         wall_ms   = std::chrono::duration<double, std::milli>(end - start).count();
-        cv_ms     = wall_ms; // OpenCV的总CUDA时间等于wall时间
-        kernel_ms = wall_ms; // OpenCV的kernel时间等于wall时间
+        cv_ms     = static_cast<float>(wall_ms); // OpenCV的总CUDA时间等于wall时间
+        kernel_ms = static_cast<float>(wall_ms); // OpenCV的kernel时间等于wall时间
 
         std::vector<double> times = {h2d_ms, d2h_ms, kernel_ms, cv_ms, wall_ms};
         return times;
@@ -169,20 +160,38 @@ public:
         auto cv_times
             = measureOpenCVExecutionTime([this, op] { cv::morphologyEx(test_image_, test_out_, op, kernel_); });
 
+        auto cuda_v0_times = measureCudaExecutionTime(
+            [this, op]
+            {
+                morphologyEx<DirectAccessStrategy, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                            img_stride_, op, d_se_mask_, 0, se_w_, se_h_, anchor_x_,
+                                                            anchor_y_, stream_);
+            });
+
         auto cuda_v1_times = measureCudaExecutionTime(
             [this, op]
             {
-                free_kick::cuda::ops::v1::morphologyEx(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
-                                                       img_stride_, op, d_se_v1_, se_w_, se_h_, anchor_x_, anchor_y_,
-                                                       block_dim_, stream_);
+                morphologyEx<SharedMemoryStrategy, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                            img_stride_, op, d_se_mask_, 0, se_w_, se_h_, anchor_x_,
+                                                            anchor_y_, stream_);
             });
 
         auto cuda_v2_times = measureCudaExecutionTime(
             [this, op]
             {
-                free_kick::cuda::ops::v2::morphologyEx(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
-                                                       img_stride_, op, d_se_v2_, n_offsets_, se_w_, se_h_, anchor_x_,
-                                                       anchor_y_, block_dim_, stream_);
+                // 为v2策略准备偏移列表
+                auto offsets
+                    = free_kick::cuda::ops::unified::buildOffsetList(kernel_.data, se_w_, se_h_, anchor_x_, anchor_y_);
+                int2 *d_offsets;
+                CUDA_CHECK(cudaMalloc(&d_offsets, offsets.size() * sizeof(int2)));
+                CUDA_CHECK(cudaMemcpyAsync(d_offsets, offsets.data(), offsets.size() * sizeof(int2),
+                                           cudaMemcpyHostToDevice, stream_));
+
+                morphologyEx<OffsetOptimizedStrategy, int2>(
+                    d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_, op, d_offsets,
+                    static_cast<int>(offsets.size()), se_w_, se_h_, anchor_x_, anchor_y_, stream_);
+
+                CUDA_CHECK(cudaFree(d_offsets));
             });
 
         // 获取操作名称
@@ -214,6 +223,7 @@ public:
 
         std::vector<std::pair<std::string, std::vector<double>>> names_times{
             {"cv",      cv_times},
+            {"v0", cuda_v0_times},
             {"v1", cuda_v1_times},
             {"v2", cuda_v2_times},
         };
@@ -240,13 +250,11 @@ protected:
     size_t   img_bytes_;
     int      img_w_, img_h_, img_stride_;
     int      se_w_, se_h_, anchor_x_, anchor_y_;
-    int      n_offsets_;
-    uint8_t *d_input_  = nullptr;
-    uint8_t *d_output_ = nullptr;
-    uint8_t *d_tmp1_   = nullptr;
-    uint8_t *d_tmp2_   = nullptr;
-    uint8_t *d_se_v1_  = nullptr;
-    int2    *d_se_v2_  = nullptr;
+    uint8_t *d_input_   = nullptr;
+    uint8_t *d_output_  = nullptr;
+    uint8_t *d_tmp1_    = nullptr;
+    uint8_t *d_tmp2_    = nullptr;
+    uint8_t *d_se_mask_ = nullptr;
 
     // CUDA 事件计时器
     cudaEvent_t ev_start, ev_stop;
