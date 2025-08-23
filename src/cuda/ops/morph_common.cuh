@@ -4,6 +4,10 @@
 
 #include <limits>
 
+#define BLOCK_SIZE_X 32
+#define BLOCK_SIZE_Y 16
+#define THREAD_SIZE  256
+
 namespace free_kick::cuda::ops {
 
 template<typename T>

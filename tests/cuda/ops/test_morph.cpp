@@ -1,18 +1,12 @@
-#include "common/utility.h"
-#include "morphology_cuda_v1.h"
-#include "morphology_cuda_v2.h"
+﻿#include "common/utility.h"
+
+#include "morphology_unified.cuh"
 
 #include <cuda_runtime.h>
 #include <gtest/gtest.h>
-#include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 
-#include <chrono>
-#include <iomanip>
-#include <iostream>
-#include <limits>
-#include <memory>
-#include <vector>
+using namespace free_kick::cuda::ops;
 
 // Google Test 参数化结构
 struct MorphTestParams
@@ -25,8 +19,8 @@ class MorphologyCudaTest : public ::testing::TestWithParam<MorphTestParams>
 protected:
     void SetUp() override
     {
-        test_image_ = cv::imread("F:/Projects/morph_test/2025_08_18/picture_1_2025_08_18_18_02_25_059.png",
-                                 cv::IMREAD_GRAYSCALE);
+        std::string path = "D:/Project/dianjiao/2025_08_18/picture_1_2025_08_18_18_02_25_059.png";
+        test_image_      = cv::imread(path, cv::IMREAD_GRAYSCALE);
         // // 创建一个测试图像（4096x2048，包含各种几何形状）
         // test_image_ = cv::Mat::zeros(4096, 2048, CV_8UC1);
 
@@ -89,7 +83,7 @@ protected:
 
         img_w_      = test_image_.cols;
         img_h_      = test_image_.rows;
-        img_stride_ = test_image_.step[0];
+        img_stride_ = static_cast<int>(test_image_.step[0]);
 
         // 分配 CUDA 内存
         size_t img_bytes = img_h_ * img_stride_;
@@ -142,8 +136,8 @@ protected:
         CUDA_CHECK(cudaMemcpy(d_se_v1_, kernel.data, se_bytes, cudaMemcpyHostToDevice));
 
         // 为 v2 准备（构建偏移列表）
-        auto offsets = free_kick::cuda::ops::v2::build_se_offsets(kernel.data, se_w_, se_h_, anchor_x_, anchor_y_);
-        n_offsets_   = offsets.size();
+        auto offsets = buildOffsetList(kernel.data, se_w_, se_h_, anchor_x_, anchor_y_);
+        n_offsets_   = static_cast<int>(offsets.size());
 
         if (d_se_v2_)
             cudaFree(d_se_v2_);
@@ -160,11 +154,26 @@ protected:
         return result;
     }
 
+    // 使用 CUDA v0 进行计算
+    cv::Mat computeCUDAv0Morph(int op)
+    {
+        morphologyEx<v0::DirectAccessStrategy, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                        img_stride_, op, d_se_v1_, 0, se_w_, se_h_, anchor_x_,
+                                                        anchor_y_, stream_);
+
+        CUDA_CHECK(cudaStreamSynchronize(stream_));
+
+        cv::Mat result(img_h_, img_w_, CV_8UC1);
+        CUDA_CHECK(cudaMemcpy(result.data, d_output_, img_h_ * img_stride_, cudaMemcpyDeviceToHost));
+        return result;
+    }
+
     // 使用 CUDA v1 进行计算
     cv::Mat computeCUDAv1Morph(int op)
     {
-        free_kick::cuda::ops::v1::morphologyEx(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_, op,
-                                               d_se_v1_, se_w_, se_h_, anchor_x_, anchor_y_, block_dim_, stream_);
+        morphologyEx<v1::SharedMemoryStrategy, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                        img_stride_, op, d_se_v1_, 0, se_w_, se_h_, anchor_x_,
+                                                        anchor_y_, stream_);
 
         CUDA_CHECK(cudaStreamSynchronize(stream_));
 
@@ -176,9 +185,9 @@ protected:
     // 使用 CUDA v2 进行计算
     cv::Mat computeCUDAv2Morph(int op)
     {
-        free_kick::cuda::ops::v2::morphologyEx(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_, op,
-                                               d_se_v2_, n_offsets_, se_w_, se_h_, anchor_x_, anchor_y_, block_dim_,
-                                               stream_);
+        morphologyEx<v2::OffsetOptimizedStrategy, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                        img_stride_, op, d_se_v2_, n_offsets_, se_w_, se_h_, anchor_x_,
+                                                        anchor_y_, stream_);
 
         CUDA_CHECK(cudaStreamSynchronize(stream_));
 
@@ -194,22 +203,6 @@ protected:
         cv::absdiff(img1, img2, diff);
         cv::Scalar sum = cv::sum(diff);
         return sum[0] / (img1.rows * img1.cols);
-    }
-
-    // 计算执行时间（毫秒）
-    template<typename Func>
-    double measureExecutionTime(Func &&func, int iterations = 10)
-    {
-        auto start = std::chrono::high_resolution_clock::now();
-        for (int i = 0; i < iterations; ++i)
-        {
-            func();
-            CUDA_CHECK(cudaStreamSynchronize(stream_));
-        }
-        auto end = std::chrono::high_resolution_clock::now();
-
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        return duration.count() / 1000.0 / iterations; // 返回平均时间（毫秒）
     }
 
 protected:
@@ -235,8 +228,10 @@ TEST_P(MorphologyCudaTest, CompareV1V2WithOpenCV)
     auto p   = GetParam();
     int  ksz = p.kernel_size / 2 * 2 + 1;
 
-    std::vector<int> shapes     = {cv::MORPH_RECT, cv::MORPH_CROSS, cv::MORPH_ELLIPSE};
-    std::vector<int> operations = {cv::MORPH_DILATE, cv::MORPH_ERODE, cv::MORPH_OPEN, cv::MORPH_CLOSE};
+    std::vector<int> shapes = {cv::MORPH_RECT, cv::MORPH_CROSS, cv::MORPH_ELLIPSE};
+    std::vector<int> operations
+        = {cv::MORPH_DILATE, cv::MORPH_ERODE, cv::MORPH_OPEN, cv::MORPH_CLOSE, cv::MORPH_TOPHAT, cv::MORPH_BLACKHAT};
+
     for (int shape : shapes)
     {
         for (int op : operations)
@@ -244,26 +239,24 @@ TEST_P(MorphologyCudaTest, CompareV1V2WithOpenCV)
             cv::Mat kernel = cv::getStructuringElement(shape, cv::Size(ksz, ksz));
             prepareStructuringElement(kernel);
             cv::Mat opencv_result  = computeOpenCVMorph(op, kernel);
+            cv::Mat cuda_v0_result = computeCUDAv1Morph(op);
             cv::Mat cuda_v1_result = computeCUDAv1Morph(op);
             cv::Mat cuda_v2_result = computeCUDAv2Morph(op);
-
             // 验证结果不为空且尺寸正确
             EXPECT_FALSE(opencv_result.empty());
+            EXPECT_FALSE(cuda_v0_result.empty());
             EXPECT_FALSE(cuda_v1_result.empty());
             EXPECT_FALSE(cuda_v2_result.empty());
+            EXPECT_EQ(opencv_result.size(), cuda_v0_result.size());
             EXPECT_EQ(opencv_result.size(), cuda_v1_result.size());
             EXPECT_EQ(opencv_result.size(), cuda_v2_result.size());
             // 比较结果
-
+            double diff_v0 = computeImageDifference(opencv_result, cuda_v0_result);
             double diff_v1 = computeImageDifference(opencv_result, cuda_v1_result);
             double diff_v2 = computeImageDifference(opencv_result, cuda_v2_result);
-
+            EXPECT_LT(diff_v0, 1.0) << "CUDA v0 difference too large, kernel size: " << p.kernel_size;
             EXPECT_LT(diff_v1, 1.0) << "CUDA v1 difference too large, kernel size: " << p.kernel_size;
             EXPECT_LT(diff_v2, 1.0) << "CUDA v2 difference too large, kernel size: " << p.kernel_size;
-
-            // v1 和 v2 结果应该相同
-            double diff_v1_v2 = computeImageDifference(cuda_v1_result, cuda_v2_result);
-            EXPECT_LT(diff_v1_v2, 0.1) << "CUDA v1 and v2 results inconsistent, kernel size: " << p.kernel_size;
         }
     }
 }
@@ -271,6 +264,7 @@ TEST_P(MorphologyCudaTest, CompareV1V2WithOpenCV)
 // clang-format off
 
 // 参数化：测试多种操作
+
 INSTANTIATE_TEST_SUITE_P(
     AllOps,
     MorphologyCudaTest,

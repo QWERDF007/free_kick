@@ -16,10 +16,10 @@ void erode<v0::DirectAccessStrategy, uint8_t>(const uint8_t *d_in, uint8_t *d_ou
                                               const uint8_t *d_se, int n_offsets, int se_w, int se_h, int anchor_x,
                                               int anchor_y, cudaStream_t stream)
 {
-    dim3   block_dim{32, 16};
+    dim3   block_dim{BLOCK_SIZE_X, BLOCK_SIZE_Y};
     dim3   grid_dim(divUp(img_w, block_dim.x), divUp(img_h, block_dim.y));
     size_t smem_bytes = 0;
-    v0::morphKernel<uint8_t, MaxReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
+    v0::morphKernel<uint8_t, MinReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
         d_in, d_out, img_w, img_h, img_stride, d_se, n_offsets, se_w, se_h, anchor_x, anchor_y);
 }
 
@@ -29,10 +29,10 @@ void erode<v1::SharedMemoryStrategy, uint8_t>(const uint8_t *d_in, uint8_t *d_ou
                                               const uint8_t *d_se, int n_offsets, int se_w, int se_h, int anchor_x,
                                               int anchor_y, cudaStream_t stream)
 {
-    dim3   block_dim{32, 16};
+    dim3   block_dim{BLOCK_SIZE_X, BLOCK_SIZE_Y};
     dim3   grid_dim(divUp(img_w, block_dim.x), divUp(img_h, block_dim.y));
     size_t smem_bytes = calcSharedMemSize<uint8_t>(block_dim, se_w, se_h, anchor_x, anchor_y);
-    v1::morphKernel<uint8_t, MaxReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
+    v1::morphKernel<uint8_t, MinReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
         d_in, d_out, img_w, img_h, img_stride, d_se, n_offsets, se_w, se_h, anchor_x, anchor_y);
 }
 
@@ -42,10 +42,10 @@ void erode<v2::OffsetOptimizedStrategy, int2>(const uint8_t *d_in, uint8_t *d_ou
                                               const int2 *d_se, int n_offsets, int se_w, int se_h, int anchor_x,
                                               int anchor_y, cudaStream_t stream)
 {
-    dim3   block_dim{32, 16};
+    dim3   block_dim{BLOCK_SIZE_X, BLOCK_SIZE_Y};
     dim3   grid_dim(divUp(img_w, block_dim.x), divUp(img_h, block_dim.y));
     size_t smem_bytes = calcSharedMemSize<uint8_t>(block_dim, se_w, se_h, anchor_x, anchor_y);
-    v2::morphKernel<uint8_t, MaxReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
+    v2::morphKernel<uint8_t, MinReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
         d_in, d_out, img_w, img_h, img_stride, d_se, n_offsets, se_w, se_h, anchor_x, anchor_y);
 }
 
@@ -60,10 +60,10 @@ void dilate<v0::DirectAccessStrategy, uint8_t>(const uint8_t *d_in, uint8_t *d_o
                                                int img_stride, const uint8_t *d_se, int n_offsets, int se_w, int se_h,
                                                int anchor_x, int anchor_y, cudaStream_t stream)
 {
-    dim3   block_dim{32, 16};
+    dim3   block_dim{BLOCK_SIZE_X, BLOCK_SIZE_Y};
     dim3   grid_dim(divUp(img_w, block_dim.x), divUp(img_h, block_dim.y));
     size_t smem_bytes = 0;
-    v0::morphKernel<uint8_t, MinReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
+    v0::morphKernel<uint8_t, MaxReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
         d_in, d_out, img_w, img_h, img_stride, d_se, n_offsets, se_w, se_h, anchor_x, anchor_y);
 }
 
@@ -73,10 +73,10 @@ void dilate<v1::SharedMemoryStrategy, uint8_t>(const uint8_t *d_in, uint8_t *d_o
                                                int img_stride, const uint8_t *d_se, int n_offsets, int se_w, int se_h,
                                                int anchor_x, int anchor_y, cudaStream_t stream)
 {
-    dim3   block_dim{32, 16};
+    dim3   block_dim{BLOCK_SIZE_X, BLOCK_SIZE_Y};
     dim3   grid_dim(divUp(img_w, block_dim.x), divUp(img_h, block_dim.y));
     size_t smem_bytes = calcSharedMemSize<uint8_t>(block_dim, se_w, se_h, anchor_x, anchor_y);
-    v1::morphKernel<uint8_t, MinReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
+    v1::morphKernel<uint8_t, MaxReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
         d_in, d_out, img_w, img_h, img_stride, d_se, n_offsets, se_w, se_h, anchor_x, anchor_y);
 }
 
@@ -86,10 +86,10 @@ void dilate<v2::OffsetOptimizedStrategy, int2>(const uint8_t *d_in, uint8_t *d_o
                                                int img_stride, const int2 *d_se, int n_offsets, int se_w, int se_h,
                                                int anchor_x, int anchor_y, cudaStream_t stream)
 {
-    dim3   block_dim{32, 16};
+    dim3   block_dim{BLOCK_SIZE_X, BLOCK_SIZE_Y};
     dim3   grid_dim(divUp(img_w, block_dim.x), divUp(img_h, block_dim.y));
     size_t smem_bytes = calcSharedMemSize<uint8_t>(block_dim, se_w, se_h, anchor_x, anchor_y);
-    v2::morphKernel<uint8_t, MinReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
+    v2::morphKernel<uint8_t, MaxReducer<uint8_t>><<<grid_dim, block_dim, smem_bytes, stream>>>(
         d_in, d_out, img_w, img_h, img_stride, d_se, n_offsets, se_w, se_h, anchor_x, anchor_y);
 }
 
@@ -126,7 +126,7 @@ void tophat(const uint8_t *d_in, uint8_t *d_out, uint8_t *d_tmp, uint8_t *d_tmp2
                            anchor_y, stream);
     // Step 2: Subtract open result from original: out = src - open
     int  total_pixels = img_w * img_h;
-    dim3 block_dim{256};
+    dim3 block_dim{THREAD_SIZE};
     dim3 grid_dim(divUp(total_pixels, block_dim.x));
     sub_clamp_kernel<uint8_t, 0, 255><<<grid_dim, block_dim, 0, stream>>>(d_in, d_tmp2, d_out, total_pixels);
 }
@@ -141,7 +141,7 @@ void blackhat(const uint8_t *d_in, uint8_t *d_out, uint8_t *d_tmp, uint8_t *d_tm
                             anchor_y, stream);
     // Step 2: Subtract original from close result: out = close - src
     int  total_pixels = img_w * img_h;
-    dim3 block_dim{256};
+    dim3 block_dim{THREAD_SIZE};
     dim3 grid_dim(divUp(total_pixels, block_dim.x));
     sub_clamp_kernel<uint8_t, 0, 255><<<grid_dim, block_dim, 0, stream>>>(d_tmp2, d_in, d_out, total_pixels);
 }
