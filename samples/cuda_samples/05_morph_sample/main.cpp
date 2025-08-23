@@ -71,9 +71,21 @@ public:
     // 准备结构元素（为统一接口）
     void prepareStructuringElement(const int shape, const int kernel_size)
     {
-        const int ksz = kernel_size / 2 * 2 + 1;
-        kernel_       = cv::getStructuringElement(shape, cv::Size(ksz, ksz));
+        const int ksz    = kernel_size / 2 * 2 + 1;
+        cv::Mat   kernel = cv::getStructuringElement(shape, cv::Size(ksz, ksz));
 
+        // 检查是否与之前的kernel相同，避免重复分配
+        if (!kernel_.empty() && kernel_.size() == kernel.size() && kernel_.type() == kernel.type())
+        {
+            cv::Mat diff;
+            cv::absdiff(kernel_, kernel, diff);
+            if (cv::countNonZero(diff) == 0)
+            {
+                return; // kernel和kernel_相同，直接返回
+            }
+        }
+
+        kernel_   = kernel; // 保存当前kernel
         se_w_     = kernel_.cols;
         se_h_     = kernel_.rows;
         anchor_x_ = se_w_ / 2;
@@ -216,7 +228,7 @@ public:
             op_name = "BLACKHAT";
             break;
         case ::cv::MORPH_TOPHAT:
-            op_name = "TOPKHAT";
+            op_name = "TOPHAT";
             break;
         default:
             op_name = "UNKNOWN";
@@ -286,18 +298,18 @@ int main(int argc, char **argv)
     }
     MorphologyCudaPerformTest runner;
     runner.SetUp(img);
-    std::map<int, std::string> shapes = {
+    std::map<int, std::string> shape_names = {
         {   cv::MORPH_RECT,    "cv::MORPH_RECT"},
         {  cv::MORPH_CROSS,   "cv::MORPH_CROSS"},
         {cv::MORPH_ELLIPSE, "cv::MORPH_ELLIPSE"},
     };
-    if (shapes.find(shape) == shapes.end())
+    if (shape_names.find(shape) == shape_names.end())
     {
         std::cerr << "No Supported Shape: " << shape << std::endl;
         std::cout << "Supported Shapes: " << std::endl;
-        for (const auto &[shape, name] : shapes)
+        for (const auto &[shape_val, name] : shape_names)
         {
-            std::cout << shape << " " << name << std::endl;
+            std::cout << shape_val << " " << name << std::endl;
         }
         return -1;
     }
@@ -306,7 +318,7 @@ int main(int argc, char **argv)
 
     std::cout << "Image size: " << img.size << std::endl;
     std::cout << "Kernel size: " << kernel_size << "x" << kernel_size << std::endl;
-    std::cout << "Shape: " << shapes[shape] << std::endl;
+    std::cout << "Shape: " << shape_names[shape] << std::endl;
     std::cout << "| OP | version | h2d time | d2h time | kernel time | cuda time | wall time | Speed up |" << std::endl;
     std::cout << "| ---- | ---- | ---- |---- | ---- | ---- | ---- | ---- |" << std::endl;
 
