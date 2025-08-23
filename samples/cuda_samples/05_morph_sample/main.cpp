@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-using namespace free_kick::cuda::ops::unified;
+using namespace free_kick::cuda::ops;
 
 class MorphologyCudaPerformTest
 {
@@ -54,7 +54,8 @@ public:
         CUDA_CHECK(cudaFree(d_output_));
         CUDA_CHECK(cudaFree(d_tmp1_));
         CUDA_CHECK(cudaFree(d_tmp2_));
-        CUDA_CHECK(cudaFree(d_se_mask_));
+        CUDA_CHECK(cudaFree(d_se_v1_));
+        CUDA_CHECK(cudaFree(d_se_v2_));
         CUDA_CHECK(cudaStreamDestroy(stream_));
 
         CUDA_CHECK(cudaEventDestroy(ev_start));
@@ -79,11 +80,20 @@ public:
         anchor_y_ = se_h_ / 2;
 
         // 为统一接口准备设备端结构元素掩码
-        if (d_se_mask_)
-            cudaFree(d_se_mask_);
-        size_t se_bytes = se_w_ * se_h_ * sizeof(uint8_t);
-        CUDA_CHECK(cudaMalloc(&d_se_mask_, se_bytes));
-        CUDA_CHECK(cudaMemcpy(d_se_mask_, kernel_.data, se_bytes, cudaMemcpyHostToDevice));
+        if (d_se_v1_)
+            cudaFree(d_se_v1_);
+        size_t se_v1_bytes = se_w_ * se_h_ * sizeof(uint8_t);
+        CUDA_CHECK(cudaMalloc(&d_se_v1_, se_v1_bytes));
+        CUDA_CHECK(cudaMemcpy(d_se_v1_, kernel_.data, se_v1_bytes, cudaMemcpyHostToDevice));
+
+        if (d_se_v2_)
+            cudaFree(d_se_v2_);
+        auto offsets = buildOffsetList(kernel_.data, se_w_, se_h_, anchor_x_, anchor_y_);
+        n_offsets_   = static_cast<int>(offsets.size());
+
+        size_t se_v2_bytes = n_offsets_ * sizeof(int2);
+        CUDA_CHECK(cudaMalloc(&d_se_v2_, se_v2_bytes));
+        CUDA_CHECK(cudaMemcpy(d_se_v2_, offsets.data(), se_v2_bytes, cudaMemcpyHostToDevice));
     }
 
     template<typename Func>
@@ -163,35 +173,27 @@ public:
         auto cuda_v0_times = measureCudaExecutionTime(
             [this, op]
             {
-                morphologyEx<DirectAccessStrategy, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
-                                                            img_stride_, op, d_se_mask_, 0, se_w_, se_h_, anchor_x_,
-                                                            anchor_y_, stream_);
+                morphologyEx<v0::DirectAccessStrategy, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                                img_stride_, op, d_se_v1_, 0, se_w_, se_h_, anchor_x_,
+                                                                anchor_y_, stream_);
             });
 
         auto cuda_v1_times = measureCudaExecutionTime(
             [this, op]
             {
-                morphologyEx<SharedMemoryStrategy, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
-                                                            img_stride_, op, d_se_mask_, 0, se_w_, se_h_, anchor_x_,
-                                                            anchor_y_, stream_);
+                morphologyEx<v1::SharedMemoryStrategy, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                                img_stride_, op, d_se_v1_, 0, se_w_, se_h_, anchor_x_,
+                                                                anchor_y_, stream_);
             });
 
         auto cuda_v2_times = measureCudaExecutionTime(
             [this, op]
             {
                 // 为v2策略准备偏移列表
-                auto offsets
-                    = free_kick::cuda::ops::unified::buildOffsetList(kernel_.data, se_w_, se_h_, anchor_x_, anchor_y_);
-                int2 *d_offsets;
-                CUDA_CHECK(cudaMalloc(&d_offsets, offsets.size() * sizeof(int2)));
-                CUDA_CHECK(cudaMemcpyAsync(d_offsets, offsets.data(), offsets.size() * sizeof(int2),
-                                           cudaMemcpyHostToDevice, stream_));
 
-                morphologyEx<OffsetOptimizedStrategy, int2>(
-                    d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_, op, d_offsets,
-                    static_cast<int>(offsets.size()), se_w_, se_h_, anchor_x_, anchor_y_, stream_);
-
-                CUDA_CHECK(cudaFree(d_offsets));
+                morphologyEx<v2::OffsetOptimizedStrategy, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                                img_stride_, op, d_se_v2_, n_offsets_, se_w_, se_h_,
+                                                                anchor_x_, anchor_y_, stream_);
             });
 
         // 获取操作名称
@@ -244,17 +246,20 @@ public:
     }
 
 protected:
-    cv::Mat  test_image_;
-    cv::Mat  test_out_;
-    cv::Mat  kernel_;
-    size_t   img_bytes_;
-    int      img_w_, img_h_, img_stride_;
-    int      se_w_, se_h_, anchor_x_, anchor_y_;
-    uint8_t *d_input_   = nullptr;
-    uint8_t *d_output_  = nullptr;
-    uint8_t *d_tmp1_    = nullptr;
-    uint8_t *d_tmp2_    = nullptr;
-    uint8_t *d_se_mask_ = nullptr;
+    cv::Mat test_image_;
+    cv::Mat test_out_;
+    cv::Mat kernel_;
+    size_t  img_bytes_;
+    int     img_w_, img_h_, img_stride_;
+    int     se_w_, se_h_, anchor_x_, anchor_y_;
+    int     n_offsets_;
+
+    uint8_t *d_input_  = nullptr;
+    uint8_t *d_output_ = nullptr;
+    uint8_t *d_tmp1_   = nullptr;
+    uint8_t *d_tmp2_   = nullptr;
+    uint8_t *d_se_v1_  = nullptr;
+    int2    *d_se_v2_  = nullptr;
 
     // CUDA 事件计时器
     cudaEvent_t ev_start, ev_stop;
@@ -269,7 +274,8 @@ protected:
 int main(int argc, char **argv)
 {
     const char *input_path  = (argc > 1) ? argv[1] : "input.png";
-    int         kernel_size = (argc > 2) ? std::max(1, atoi(argv[2])) : 3; // 结构元素大小
+    int         shape       = (argc > 2) ? std::max(1, atoi(argv[2])) : 2; // 结构元形状
+    int         kernel_size = (argc > 3) ? std::max(1, atoi(argv[3])) : 3; // 结构元素大小
 
     // 读入灰度图
     cv::Mat img = cv::imread(input_path, cv::IMREAD_GRAYSCALE);
@@ -280,17 +286,33 @@ int main(int argc, char **argv)
     }
     MorphologyCudaPerformTest runner;
     runner.SetUp(img);
-    // std::vector<int> shapes     = {cv::MORPH_RECT, cv::MORPH_CROSS, cv::MORPH_ELLIPSE};
+    std::map<int, std::string> shapes = {
+        {   cv::MORPH_RECT,    "cv::MORPH_RECT"},
+        {  cv::MORPH_CROSS,   "cv::MORPH_CROSS"},
+        {cv::MORPH_ELLIPSE, "cv::MORPH_ELLIPSE"},
+    };
+    if (shapes.find(shape) == shapes.end())
+    {
+        std::cerr << "No Supported Shape: " << shape << std::endl;
+        std::cout << "Supported Shapes: " << std::endl;
+        for (const auto &[shape, name] : shapes)
+        {
+            std::cout << shape << " " << name << std::endl;
+        }
+        return -1;
+    }
     std::vector<int> operations
         = {cv::MORPH_DILATE, cv::MORPH_ERODE, cv::MORPH_OPEN, cv::MORPH_CLOSE, cv::MORPH_TOPHAT, cv::MORPH_BLACKHAT};
 
     std::cout << "Image size: " << img.size << std::endl;
+    std::cout << "Kernel size: " << kernel_size << "x" << kernel_size << std::endl;
+    std::cout << "Shape: " << shapes[shape] << std::endl;
     std::cout << "| OP | version | h2d time | d2h time | kernel time | cuda time | wall time | Speed up |" << std::endl;
     std::cout << "| ---- | ---- | ---- |---- | ---- | ---- | ---- | ---- |" << std::endl;
 
     for (int op : operations)
     {
-        runner.run(cv::MORPH_ELLIPSE, op, kernel_size);
+        runner.run(shape, op, kernel_size);
     }
     runner.TearDown();
     return 0;
