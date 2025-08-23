@@ -201,6 +201,12 @@ public:
         case cv::MORPH_CLOSE:
             op_name = "CLOSE";
             break;
+        case ::cv::MORPH_BLACKHAT:
+            op_name = "BLACKHAT";
+            break;
+        case ::cv::MORPH_TOPHAT:
+            op_name = "TOPKHAT";
+            break;
         default:
             op_name = "UNKNOWN";
             break;
@@ -267,7 +273,8 @@ int main(int argc, char **argv)
     MorphologyCudaPerformTest runner;
     runner.SetUp(img);
     // std::vector<int> shapes     = {cv::MORPH_RECT, cv::MORPH_CROSS, cv::MORPH_ELLIPSE};
-    std::vector<int> operations = {cv::MORPH_DILATE, cv::MORPH_ERODE, cv::MORPH_OPEN, cv::MORPH_CLOSE};
+    std::vector<int> operations
+        = {cv::MORPH_DILATE, cv::MORPH_ERODE, cv::MORPH_OPEN, cv::MORPH_CLOSE, cv::MORPH_TOPHAT, cv::MORPH_BLACKHAT};
 
     std::cout << "Image size: " << img.size << std::endl;
     std::cout << "| OP | version | h2d time | d2h time | kernel time | cuda time | wall time | Speed up |" << std::endl;
