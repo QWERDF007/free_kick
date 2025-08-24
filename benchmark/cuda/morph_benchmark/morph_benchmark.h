@@ -16,7 +16,7 @@ namespace free_kick::cuda::benchmark {
 class MorphBenchmarkData
 {
 public:
-    MorphBenchmarkData(const std::string &img_path, int kernel_size, int se_shape = cv::MORPH_ELLIPSE);
+    MorphBenchmarkData(const std::string &img_path);
     ~MorphBenchmarkData();
 
     // 禁用拷贝构造和赋值
@@ -25,8 +25,8 @@ public:
 
     void getStructuringElement(int kernel_size, int se_shape);
 
-    int kernel_size;
-    int se_shape; // 结构元素形状
+    int kernel_size{0};
+    int se_shape{0}; // 结构元素形状
     int width, height, stride;
     int se_w, se_h;
     int anchor_x, anchor_y;
@@ -41,8 +41,8 @@ public:
     uint8_t *d_output = nullptr;
     uint8_t *d_tmp1   = nullptr;
     uint8_t *d_tmp2   = nullptr;
-    uint8_t *d_se_v0  = nullptr; // v0 使用 uint8_t 掩码
-    int2    *d_se_v2  = nullptr; // v2 使用 int2 偏移
+    uint8_t *d_se_u8  = nullptr; // v0 使用 uint8_t 掩码
+    int2    *d_se_i2  = nullptr; // v2 使用 int2 偏移
 
     dim3         block_dim;
     cudaStream_t stream = nullptr;
@@ -52,7 +52,7 @@ public:
 extern std::unique_ptr<MorphBenchmarkData> g_benchmark_data;
 
 // 初始化函数
-void InitializeBenchmarkData(const std::string &img_path, int kernel_size, int se_shape = cv::MORPH_ELLIPSE);
+void InitializeBenchmarkData(const std::string &img_path);
 void CleanupBenchmarkData();
 
 } // namespace free_kick::cuda::benchmark
@@ -86,15 +86,15 @@ void BM_CUDA_Morphology(benchmark::State &state)
     SEType *d_se;
     int     n_offsets;
 
-    if constexpr (std::is_same_v<SEType, uint8_t>) // v0、v1
+    if constexpr (std::is_same_v<SEType, uint8_t>) // v0、v1、v2、v3
     {
-        d_se      = data.d_se_v0;
-        n_offsets = data.se_w * data.se_h;
+        d_se      = data.d_se_u8;
+        n_offsets = 0; // v0-v3不使用偏移列表，n_offsets设为0
     }
     else
     {
-        // v2 使用 int2 偏移
-        d_se      = data.d_se_v2;
+        // v4 使用 int2 偏移列表
+        d_se      = data.d_se_i2;
         n_offsets = data.n_offsets;
     }
 

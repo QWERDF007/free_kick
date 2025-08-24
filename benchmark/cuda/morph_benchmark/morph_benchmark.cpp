@@ -13,9 +13,7 @@ std::unique_ptr<MorphBenchmarkData> g_benchmark_data;
 
 // ==================== MorphBenchmarkData 实现 ====================
 
-MorphBenchmarkData::MorphBenchmarkData(const std::string &test_image_path, int kernel_size, int se_shape)
-    : kernel_size(kernel_size)
-    , se_shape(se_shape)
+MorphBenchmarkData::MorphBenchmarkData(const std::string &test_image_path)
 {
     // 尝试加载指定图片获取实际尺寸
     test_image = cv::imread(test_image_path, cv::IMREAD_GRAYSCALE);
@@ -39,9 +37,6 @@ MorphBenchmarkData::MorphBenchmarkData(const std::string &test_image_path, int k
     cudaStreamCreate(&stream);
 
     cudaMemcpy(d_input, test_image.data, img_bytes, cudaMemcpyHostToDevice);
-
-    // 生成结构元素
-    getStructuringElement(kernel_size, se_shape);
 }
 
 MorphBenchmarkData::~MorphBenchmarkData()
@@ -51,10 +46,10 @@ MorphBenchmarkData::~MorphBenchmarkData()
     cudaFree(d_output);
     cudaFree(d_tmp1);
     cudaFree(d_tmp2);
-    if (d_se_v0)
-        cudaFree(d_se_v0);
-    if (d_se_v2)
-        cudaFree(d_se_v2);
+    if (d_se_u8)
+        cudaFree(d_se_u8);
+    if (d_se_i2)
+        cudaFree(d_se_i2);
 }
 
 void MorphBenchmarkData::getStructuringElement(int _kernel_size, int _se_shape)
@@ -71,29 +66,29 @@ void MorphBenchmarkData::getStructuringElement(int _kernel_size, int _se_shape)
     anchor_x = se_w / 2;
     anchor_y = se_h / 2;
 
-    // 为 v0 准备（直接复制掩码）
-    if (d_se_v0)
-        cudaFree(d_se_v0);
+    // 直接复制掩码
+    if (d_se_u8)
+        cudaFree(d_se_u8);
     size_t se_bytes = se_w * se_h * sizeof(uint8_t);
-    cudaMalloc(&d_se_v0, se_bytes);
-    cudaMemcpy(d_se_v0, kernel.data, se_bytes, cudaMemcpyHostToDevice);
+    cudaMalloc(&d_se_u8, se_bytes);
+    cudaMemcpy(d_se_u8, kernel.data, se_bytes, cudaMemcpyHostToDevice);
 
-    // 为 v2 准备（构建偏移列表）
+    // 构建偏移列表
     auto offsets = free_kick::cuda::ops::buildOffsetList(kernel.data, se_w, se_h, anchor_x, anchor_y);
     n_offsets    = static_cast<int>(offsets.size());
 
-    if (d_se_v2)
-        cudaFree(d_se_v2);
+    if (d_se_i2)
+        cudaFree(d_se_i2);
     size_t offsets_bytes = n_offsets * sizeof(int2);
-    cudaMalloc(&d_se_v2, offsets_bytes);
-    cudaMemcpy(d_se_v2, offsets.data(), offsets_bytes, cudaMemcpyHostToDevice);
+    cudaMalloc(&d_se_i2, offsets_bytes);
+    cudaMemcpy(d_se_i2, offsets.data(), offsets_bytes, cudaMemcpyHostToDevice);
 }
 
 // ==================== 全局初始化函数 ====================
 
-void InitializeBenchmarkData(const std::string &path, const int kernel_size, const int se_shape)
+void InitializeBenchmarkData(const std::string &path)
 {
-    g_benchmark_data = std::make_unique<MorphBenchmarkData>(path, kernel_size, se_shape);
+    g_benchmark_data = std::make_unique<MorphBenchmarkData>(path);
 }
 
 void CleanupBenchmarkData()

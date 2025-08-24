@@ -2,7 +2,9 @@
 
 #include <cuda_runtime.h>
 
+#include <cstdint>
 #include <limits>
+#include <vector>
 
 #define BLOCK_SIZE_X 32
 #define BLOCK_SIZE_Y 16
@@ -75,6 +77,35 @@ __device__ __forceinline__ int clampIndexNoBranch(int x, int low, int high_exclu
     int hi = high_exclusive - 1;
     x      = (x < hi ? x : hi);
     return x;
+}
+
+// 计算共享内存大小
+template<typename T>
+inline size_t calcSharedMemSize(dim3 block_dim, int se_w, int se_h, int anchor_x, int anchor_y)
+{
+    const int left   = anchor_x;
+    const int right  = se_w - 1 - anchor_x;
+    const int top    = anchor_y;
+    const int bottom = se_h - 1 - anchor_y;
+    return size_t(block_dim.x + left + right) * size_t(block_dim.y + top + bottom) * sizeof(T);
+}
+
+// 构建偏移列表（用于v4）
+inline std::vector<int2> buildOffsetList(const uint8_t *h_se, int se_w, int se_h, int anchor_x, int anchor_y)
+{
+    std::vector<int2> offsets;
+    offsets.reserve(se_w * se_h);
+    for (int ky = 0; ky < se_h; ++ky)
+    {
+        for (int kx = 0; kx < se_w; ++kx)
+        {
+            if (h_se[ky * se_w + kx])
+            {
+                offsets.push_back(make_int2(kx - anchor_x, ky - anchor_y));
+            }
+        }
+    }
+    return offsets;
 }
 
 } // namespace free_kick::cuda::ops

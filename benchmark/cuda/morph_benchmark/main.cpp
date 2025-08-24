@@ -63,7 +63,7 @@ void RegisterBenchmarks()
                 benchmark::RegisterBenchmark(
                     ("CUDA_V0_" + op_name + "_" + shape_name + "_" + std::to_string(kernel_size)).c_str(),
                     [morph_op, kernel_size, se_shape](benchmark::State &state)
-                    { BM_CUDA_Morphology<free_kick::cuda::ops::v0::DirectAccessExecutor<uint8_t>, uint8_t>(state); })
+                    { BM_CUDA_Morphology<free_kick::cuda::ops::v0<uint8_t>, uint8_t>(state); })
                     ->Unit(benchmark::kMicrosecond)
                     ->UseRealTime()
                     ->Args({morph_op, kernel_size, se_shape});
@@ -72,7 +72,7 @@ void RegisterBenchmarks()
                 benchmark::RegisterBenchmark(
                     ("CUDA_V1_" + op_name + "_" + shape_name + "_" + std::to_string(kernel_size)).c_str(),
                     [morph_op, kernel_size, se_shape](benchmark::State &state)
-                    { BM_CUDA_Morphology<free_kick::cuda::ops::v1::SharedMemoryExecutor<uint8_t>, uint8_t>(state); })
+                    { BM_CUDA_Morphology<free_kick::cuda::ops::v1<uint8_t>, uint8_t>(state); })
                     ->Unit(benchmark::kMicrosecond)
                     ->UseRealTime()
                     ->Args({morph_op, kernel_size, se_shape});
@@ -81,7 +81,25 @@ void RegisterBenchmarks()
                 benchmark::RegisterBenchmark(
                     ("CUDA_V2_" + op_name + "_" + shape_name + "_" + std::to_string(kernel_size)).c_str(),
                     [morph_op, kernel_size, se_shape](benchmark::State &state)
-                    { BM_CUDA_Morphology<free_kick::cuda::ops::v2::OffsetOptimizedExecutor<uint8_t>, int2>(state); })
+                    { BM_CUDA_Morphology<free_kick::cuda::ops::v2<uint8_t>, uint8_t>(state); })
+                    ->Unit(benchmark::kMicrosecond)
+                    ->UseRealTime()
+                    ->Args({morph_op, kernel_size, se_shape});
+
+                // CUDA V3 版本
+                benchmark::RegisterBenchmark(
+                    ("CUDA_V3_" + op_name + "_" + shape_name + "_" + std::to_string(kernel_size)).c_str(),
+                    [morph_op, kernel_size, se_shape](benchmark::State &state)
+                    { BM_CUDA_Morphology<free_kick::cuda::ops::v3<uint8_t>, uint8_t>(state); })
+                    ->Unit(benchmark::kMicrosecond)
+                    ->UseRealTime()
+                    ->Args({morph_op, kernel_size, se_shape});
+
+                // CUDA V4 版本
+                benchmark::RegisterBenchmark(
+                    ("CUDA_V4_" + op_name + "_" + shape_name + "_" + std::to_string(kernel_size)).c_str(),
+                    [morph_op, kernel_size, se_shape](benchmark::State &state)
+                    { BM_CUDA_Morphology<free_kick::cuda::ops::v4<uint8_t>, int2>(state); })
                     ->Unit(benchmark::kMicrosecond)
                     ->UseRealTime()
                     ->Args({morph_op, kernel_size, se_shape});
@@ -96,21 +114,19 @@ int main(int argc, char **argv)
     {
         // 初始化测试数据（使用默认参数）
         std::cout << "Init benchmark test data..." << std::endl;
-        InitializeBenchmarkData("F:/Projects/morph_test/2025_08_18/picture_1_2025_08_18_18_02_25_059.png", 5,
-                                cv::MORPH_ELLIPSE);
+        InitializeBenchmarkData("D:/Project/dianjiao/2025_08_18/picture_1_2025_08_18_18_02_25_059.png");
         std::cout << "Init Done!" << std::endl;
 
         // 运行 benchmark
         std::cout << "Run benchmark..." << std::endl;
         std::cout << "Config: \n"
-                  << "\t Image size: " << g_benchmark_data->test_image.size
-                  << " , Kernel(ELLIPSE): " << g_benchmark_data->kernel.size << std::endl;
-        std::cout << "\t CUDA v0 vs CUDA v1 vs CUDA v2 vs OpenCV" << std::endl;
+                  << "\t Image size: " << g_benchmark_data->test_image.size << std::endl;
         std::cout << "\t Testing combinations:" << std::endl;
         std::cout << "\t - Operations: " << morph_ops.size() << " types" << std::endl;
         std::cout << "\t - Shapes: " << se_shapes.size() << " types" << std::endl;
         std::cout << "\t - Kernel sizes: " << kernel_sizes.size() << " sizes" << std::endl;
-        std::cout << "\t - Total combinations: " << morph_ops.size() * se_shapes.size() * kernel_sizes.size()
+        std::cout << "\t - Total combinations: "
+                  << morph_ops.size() * se_shapes.size() * kernel_sizes.size() * 6 // 5个CUDA版本 + 1个OpenCV版本
                   << std::endl;
         std::cout << "========================================" << std::endl;
 

@@ -1,18 +1,12 @@
 ﻿#pragma once
 
-#include "opsdef.h"
-
 #include "morph_common.cuh"
 
-#include <opencv2/opencv.hpp>
+namespace free_kick::cuda::ops {
 
-#include <cstdint>
-
-namespace free_kick::cuda::ops::v1 {
-
-// v1: 共享内存优化
+// v1: 无分支 clamp
 template<typename T>
-struct SharedMemoryExecutor
+struct v1
 {
     template<typename Reducer>
     __device__ void operator()(const Reducer &reducer, const T *__restrict__ in, T *__restrict__ out, const int img_w,
@@ -20,55 +14,26 @@ struct SharedMemoryExecutor
                                const int n_offsets, const int se_w, const int se_h, const int anchor_x,
                                const int anchor_y) const
     {
-        extern __shared__ unsigned char smem_u8[];
-
-        T *smem = reinterpret_cast<T *>(smem_u8);
-
-        const int left   = anchor_x;
-        const int right  = se_w - 1 - anchor_x;
-        const int top    = anchor_y;
-        const int bottom = se_h - 1 - anchor_y;
-
-        const int tile_w = blockDim.x + left + right;
-        const int tile_h = blockDim.y + top + bottom;
-
-        const int block_x = blockIdx.x * blockDim.x;
-        const int block_y = blockIdx.y * blockDim.y;
-
-        // 共享内存加载（分块遍历）
-        for (int yy = threadIdx.y; yy < tile_h; yy += blockDim.y)
-        {
-            int      gy     = clampIndex(block_y + yy - top, 0, img_h);
-            const T *in_row = in + gy * img_stride;
-
-            for (int xx = threadIdx.x; xx < tile_w; xx += blockDim.x)
-            {
-                int gx                 = clampIndex(block_x + xx - left, 0, img_w);
-                smem[yy * tile_w + xx] = in_row[gx];
-            }
-        }
-        __syncthreads();
-
-        const int x = block_x + threadIdx.x;
-        const int y = block_y + threadIdx.y;
+        const int x = blockIdx.x * blockDim.x + threadIdx.x;
+        const int y = blockIdx.y * blockDim.y + threadIdx.y;
         if (x >= img_w || y >= img_h)
             return;
 
         T acc = reducer.init();
 
-        // 以共享内存为中心并依据掩码进行 reduce
-        const int sx = threadIdx.x + left;
-        const int sy = threadIdx.y + top;
-
+        // 遍历结构元素
         for (int ky = 0; ky < se_h; ++ky)
         {
-            const int      row    = (sy + (ky - anchor_y)) * tile_w;
+            int            iy     = clampIndexNoBranch(y + ky - anchor_y, 0, img_h);
             const uint8_t *se_row = d_se + ky * se_w;
+
             for (int kx = 0; kx < se_w; ++kx)
             {
                 if (se_row[kx])
                 {
-                    acc = reducer.reduce(acc, smem[row + (sx + (kx - anchor_x))]);
+                    int ix  = clampIndexNoBranch(x + kx - anchor_x, 0, img_w);
+                    T   val = in[iy * img_stride + ix];
+                    acc     = reducer.reduce(acc, val);
                 }
             }
         }
@@ -76,15 +41,10 @@ struct SharedMemoryExecutor
         out[y * img_stride + x] = acc;
     }
 
-    // 计算共享内存大小
-    inline size_t calcSharedMemSize(dim3 block_dim, int se_w, int se_h, int anchor_x, int anchor_y)
+    size_t getSharedMemSize(dim3, int, int, int, int)
     {
-        const int left   = anchor_x;
-        const int right  = se_w - 1 - anchor_x;
-        const int top    = anchor_y;
-        const int bottom = se_h - 1 - anchor_y;
-        return size_t(block_dim.x + left + right) * size_t(block_dim.y + top + bottom) * sizeof(T);
+        return 0;
     }
 };
 
-} // namespace free_kick::cuda::ops::v1
+} // namespace free_kick::cuda::ops

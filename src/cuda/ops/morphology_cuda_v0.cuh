@@ -1,19 +1,12 @@
 ﻿#pragma once
 
-#include "opsdef.h"
-
 #include "morph_common.cuh"
-#include "morphology_unified.cuh"
 
-#include <opencv2/opencv.hpp>
-
-#include <cstdint>
-
-namespace free_kick::cuda::ops::v0 {
+namespace free_kick::cuda::ops {
 
 // v0: 直接全局内存访问
 template<typename T>
-struct DirectAccessExecutor
+struct v0
 {
     // 结构元素 se 为大小 se_w x se_h 的二值掩码，anchor_x/anchor_y 为锚点（通常为中心）
     // 边界采用 replicate（坐标 clamp）
@@ -50,10 +43,10 @@ struct DirectAccessExecutor
         out[y * img_stride + x] = acc;
     }
 
-    inline size_t calcSharedMemSize(dim3, int, int, int, int)
+    size_t getSharedMemSize(dim3, int, int, int, int)
     {
         return 0;
     }
 };
 
-} // namespace free_kick::cuda::ops::v0
+} // namespace free_kick::cuda::ops

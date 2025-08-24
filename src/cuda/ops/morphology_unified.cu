@@ -22,7 +22,7 @@ void erode(const T *d_in, T *d_out, int img_w, int img_h, int img_stride, const 
     MinReducer<T> reducer;
     dim3          block_dim{BLOCK_SIZE_X, BLOCK_SIZE_Y};
     dim3          grid_dim(divUp(img_w, block_dim.x), divUp(img_h, block_dim.y));
-    size_t        smem_bytes = executor.calcSharedMemSize(block_dim, se_w, se_h, anchor_x, anchor_y);
+    size_t        smem_bytes = executor.getSharedMemSize(block_dim, se_w, se_h, anchor_x, anchor_y);
     kernel<Executor, T, SEType, MinReducer<T>><<<grid_dim, block_dim, smem_bytes, stream>>>(
         executor, reducer, d_in, d_out, img_w, img_h, img_stride, d_se, n_offsets, se_w, se_h, anchor_x, anchor_y);
 }
@@ -35,7 +35,7 @@ void dilate(const T *d_in, T *d_out, int img_w, int img_h, int img_stride, const
     MaxReducer<T> reducer;
     dim3          block_dim{BLOCK_SIZE_X, BLOCK_SIZE_Y};
     dim3          grid_dim(divUp(img_w, block_dim.x), divUp(img_h, block_dim.y));
-    size_t        smem_bytes = executor.calcSharedMemSize(block_dim, se_w, se_h, anchor_x, anchor_y);
+    size_t        smem_bytes = executor.getSharedMemSize(block_dim, se_w, se_h, anchor_x, anchor_y);
     kernel<Executor, T, SEType, MaxReducer<T>><<<grid_dim, block_dim, smem_bytes, stream>>>(
         executor, reducer, d_in, d_out, img_w, img_h, img_stride, d_se, n_offsets, se_w, se_h, anchor_x, anchor_y);
 }

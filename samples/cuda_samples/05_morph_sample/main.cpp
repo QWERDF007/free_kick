@@ -54,8 +54,8 @@ public:
         CUDA_CHECK(cudaFree(d_output_));
         CUDA_CHECK(cudaFree(d_tmp1_));
         CUDA_CHECK(cudaFree(d_tmp2_));
-        CUDA_CHECK(cudaFree(d_se_v1_));
-        CUDA_CHECK(cudaFree(d_se_v2_));
+        CUDA_CHECK(cudaFree(d_se_u8_));
+        CUDA_CHECK(cudaFree(d_se_i2_));
         CUDA_CHECK(cudaStreamDestroy(stream_));
 
         CUDA_CHECK(cudaEventDestroy(ev_start));
@@ -92,21 +92,21 @@ public:
         anchor_y_ = se_h_ / 2;
 
         // 为统一接口准备设备端结构元素掩码
-        if (d_se_v1_)
-            cudaFree(d_se_v1_);
-        size_t se_v1_bytes = se_w_ * se_h_ * sizeof(uint8_t);
-        CUDA_CHECK(cudaMalloc(&d_se_v1_, se_v1_bytes));
-        CUDA_CHECK(cudaMemcpy(d_se_v1_, kernel_.data, se_v1_bytes, cudaMemcpyHostToDevice));
+        if (d_se_u8_)
+            cudaFree(d_se_u8_);
+        size_t se_u8_bytes = se_w_ * se_h_ * sizeof(uint8_t);
+        CUDA_CHECK(cudaMalloc(&d_se_u8_, se_u8_bytes));
+        CUDA_CHECK(cudaMemcpy(d_se_u8_, kernel_.data, se_u8_bytes, cudaMemcpyHostToDevice));
 
         // 准备偏移列表
-        if (d_se_v2_)
-            cudaFree(d_se_v2_);
+        if (d_se_i2_)
+            cudaFree(d_se_i2_);
         auto offsets = buildOffsetList(kernel_.data, se_w_, se_h_, anchor_x_, anchor_y_);
         n_offsets_   = static_cast<int>(offsets.size());
 
-        size_t se_v2_bytes = n_offsets_ * sizeof(int2);
-        CUDA_CHECK(cudaMalloc(&d_se_v2_, se_v2_bytes));
-        CUDA_CHECK(cudaMemcpy(d_se_v2_, offsets.data(), se_v2_bytes, cudaMemcpyHostToDevice));
+        size_t se_i2_bytes = n_offsets_ * sizeof(int2);
+        CUDA_CHECK(cudaMalloc(&d_se_i2_, se_i2_bytes));
+        CUDA_CHECK(cudaMemcpy(d_se_i2_, offsets.data(), se_i2_bytes, cudaMemcpyHostToDevice));
     }
 
     template<typename Func>
@@ -186,25 +186,36 @@ public:
         auto cuda_v0_times = measureCudaExecutionTime(
             [this, op]
             {
-                morphologyEx<v0::DirectAccessExecutor<uint8_t>, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_,
-                                                                         img_h_, img_stride_, op, d_se_v1_, 0, se_w_,
-                                                                         se_h_, anchor_x_, anchor_y_, stream_);
+                morphologyEx<v0<uint8_t>, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_,
+                                                   op, d_se_u8_, 0, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
             });
 
         auto cuda_v1_times = measureCudaExecutionTime(
             [this, op]
             {
-                morphologyEx<v1::SharedMemoryExecutor<uint8_t>, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_,
-                                                                         img_h_, img_stride_, op, d_se_v1_, 0, se_w_,
-                                                                         se_h_, anchor_x_, anchor_y_, stream_);
+                morphologyEx<v1<uint8_t>, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_,
+                                                   op, d_se_u8_, 0, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
             });
 
         auto cuda_v2_times = measureCudaExecutionTime(
             [this, op]
             {
-                morphologyEx<v2::OffsetOptimizedExecutor<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_,
-                                                                         img_h_, img_stride_, op, d_se_v2_, n_offsets_,
-                                                                         se_w_, se_h_, anchor_x_, anchor_y_, stream_);
+                morphologyEx<v2<uint8_t>, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_,
+                                                   op, d_se_u8_, 0, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
+            });
+
+        auto cuda_v3_times = measureCudaExecutionTime(
+            [this, op]
+            {
+                morphologyEx<v3<uint8_t>, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_,
+                                                   op, d_se_u8_, 0, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
+            });
+
+        auto cuda_v4_times = measureCudaExecutionTime(
+            [this, op]
+            {
+                morphologyEx<v4<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_, op,
+                                                d_se_i2_, n_offsets_, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
             });
 
         // 获取操作名称
@@ -239,6 +250,8 @@ public:
             {"v0", cuda_v0_times},
             {"v1", cuda_v1_times},
             {"v2", cuda_v2_times},
+            {"v3", cuda_v3_times},
+            {"v4", cuda_v4_times},
         };
 
         // 提取时间数据 [h2d_ms, d2h_ms, kernel_ms, cuda_total_ms, wall_ms]
@@ -269,8 +282,8 @@ protected:
     uint8_t *d_output_ = nullptr;
     uint8_t *d_tmp1_   = nullptr;
     uint8_t *d_tmp2_   = nullptr;
-    uint8_t *d_se_v1_  = nullptr;
-    int2    *d_se_v2_  = nullptr;
+    uint8_t *d_se_u8_  = nullptr;
+    int2    *d_se_i2_  = nullptr;
 
     // CUDA 事件计时器
     cudaEvent_t ev_start, ev_stop;

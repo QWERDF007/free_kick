@@ -4,9 +4,9 @@
 
 namespace free_kick::cuda::ops {
 
-// v2: 共享内存优化
+// v3: 共享内存优化 + 无分支 clamp
 template<typename T>
-struct v2
+struct v3
 {
     template<typename Reducer>
     __device__ void operator()(const Reducer &reducer, const T *__restrict__ in, T *__restrict__ out, const int img_w,
@@ -32,12 +32,12 @@ struct v2
         // 共享内存加载（分块遍历）
         for (int yy = threadIdx.y; yy < tile_h; yy += blockDim.y)
         {
-            int      gy     = clampIndex(block_y + yy - top, 0, img_h);
+            int      gy     = clampIndexNoBranch(block_y + yy - top, 0, img_h);
             const T *in_row = in + gy * img_stride;
 
             for (int xx = threadIdx.x; xx < tile_w; xx += blockDim.x)
             {
-                int gx                 = clampIndex(block_x + xx - left, 0, img_w);
+                int gx                 = clampIndexNoBranch(block_x + xx - left, 0, img_w);
                 smem[yy * tile_w + xx] = in_row[gx];
             }
         }
