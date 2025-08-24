@@ -16,16 +16,17 @@ namespace free_kick::cuda::benchmark {
 class MorphBenchmarkData
 {
 public:
-    MorphBenchmarkData(const std::string &img_path, int se_size);
+    MorphBenchmarkData(const std::string &img_path, int kernel_size, int se_shape = cv::MORPH_ELLIPSE);
     ~MorphBenchmarkData();
 
     // 禁用拷贝构造和赋值
     MorphBenchmarkData(const MorphBenchmarkData &)            = delete;
     MorphBenchmarkData &operator=(const MorphBenchmarkData &) = delete;
 
-    void getStructuringElement();
+    void getStructuringElement(int kernel_size, int se_shape);
 
     int kernel_size;
+    int se_shape; // 结构元素形状
     int width, height, stride;
     int se_w, se_h;
     int anchor_x, anchor_y;
@@ -51,7 +52,7 @@ public:
 extern std::unique_ptr<MorphBenchmarkData> g_benchmark_data;
 
 // 初始化函数
-void InitializeBenchmarkData(const std::string &img_path, int kernel_size);
+void InitializeBenchmarkData(const std::string &img_path, int kernel_size, int se_shape = cv::MORPH_ELLIPSE);
 void CleanupBenchmarkData();
 
 } // namespace free_kick::cuda::benchmark
@@ -70,8 +71,16 @@ void BM_CUDA_Morphology(benchmark::State &state)
 
     auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
 
-    // 从 benchmark 参数中获取操作类型
-    int morph_op = state.range(0);
+    // 从 benchmark 参数中获取操作类型、kernel_size 和 se_shape
+    int morph_op    = static_cast<int>(state.range(0));
+    int kernel_size = static_cast<int>(state.range(1));
+    int se_shape    = static_cast<int>(state.range(2));
+
+    // 如果参数发生变化，重新生成结构元素
+    if (kernel_size != data.kernel_size || se_shape != data.se_shape)
+    {
+        data.getStructuringElement(kernel_size, se_shape);
+    }
 
     // 根据执行器类型选择合适的结构元素数据
     SEType *d_se;
@@ -96,14 +105,6 @@ void BM_CUDA_Morphology(benchmark::State &state)
             n_offsets, data.se_w, data.se_h, data.anchor_x, data.anchor_y, data.stream);
         cudaStreamSynchronize(data.stream);
     }
-
-    // // 为膨胀操作添加性能计数器
-    // // if (morph_op == cv::MORPH_DILATE)
-    // {
-    //     double pixels_processed      = static_cast<double>(data.width * data.height);
-    //     state.counters["pixels/sec"] = benchmark::Counter(pixels_processed, benchmark::Counter::kIsRate);
-    //     state.counters["MPix/sec"]   = benchmark::Counter(pixels_processed / 1e6, benchmark::Counter::kIsRate);
-    // }
 }
 
 // ==================== OpenCV 版本模板函数 ====================
