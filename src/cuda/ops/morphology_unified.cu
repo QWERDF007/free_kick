@@ -9,6 +9,7 @@ __global__ void kernel(const Executor &executor, const Reducer &reducer, const T
                        const int img_w, const int img_h, const int img_stride, const SEType *__restrict__ d_se,
                        const int n_offsets, const int se_w, const int se_h, const int anchor_x, const int anchor_y)
 {
+    // 调用 Executor 中的 __device__ void operator()
     executor(reducer, in, out, img_w, img_h, img_stride, d_se, n_offsets, se_w, se_h, anchor_x, anchor_y);
 }
 

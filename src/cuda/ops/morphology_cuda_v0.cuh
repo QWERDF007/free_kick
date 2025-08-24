@@ -50,7 +50,7 @@ struct DirectAccessExecutor
         out[y * img_stride + x] = acc;
     }
 
-    inline size_t calcSharedMemSize(dim3 block_dim, int se_w, int se_h, int anchor_x, int anchor_y)
+    inline size_t calcSharedMemSize(dim3, int, int, int, int)
     {
         return 0;
     }
