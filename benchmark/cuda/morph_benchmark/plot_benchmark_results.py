@@ -11,9 +11,66 @@ import pandas as pd
 from pathlib import Path
 import argparse
 
-# 设置中文字体支持
-plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
-plt.rcParams['axes.unicode_minus'] = False
+# 设置中文字体支持和字符编码
+import matplotlib
+matplotlib.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans', 'sans-serif']
+matplotlib.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+matplotlib.rcParams['font.size'] = 10
+
+# 设置后端和编码
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
+
+def setup_matplotlib_fonts():
+    """设置 matplotlib 字体配置，避免字符显示警告"""
+    import matplotlib.font_manager as fm
+    
+    # 检查可用的中文字体
+    available_fonts = [f.name for f in fm.fontManager.ttflist]
+    
+    # 优先级顺序的字体列表
+    preferred_fonts = [
+        'Microsoft YaHei',    # Windows 默认中文字体
+        'SimHei',            # 黑体
+        'STSong',            # 华文宋体
+        'Arial Unicode MS',   # macOS 中文支持
+        'Noto Sans CJK',     # Linux 中文支持
+        'WenQuanYi Micro Hei', # Linux 文泉驿
+        'DejaVu Sans',       # 通用字体
+        'Arial',             # 基础字体
+        'sans-serif'         # 系统默认
+    ]
+    
+    # 找到第一个可用的字体
+    selected_font = 'sans-serif'  # 默认
+    for font in preferred_fonts:
+        if font in available_fonts:
+            selected_font = font
+            break
+    
+    # 更新字体配置
+    matplotlib.rcParams['font.sans-serif'] = [selected_font] + preferred_fonts
+    matplotlib.rcParams['axes.unicode_minus'] = False
+    matplotlib.rcParams['font.size'] = 10
+    
+    # 额外的配置来避免警告
+    matplotlib.rcParams['axes.formatter.use_mathtext'] = True
+    matplotlib.rcParams['mathtext.fontset'] = 'stix'
+    
+    print(f"使用字体: {selected_font}")
+
+def setup_kernel_size_ticks(ax, kernel_sizes):
+    """为 kernel size 轴设置更好的刻度显示"""
+    if not kernel_sizes:
+        return
+    
+    # 设置所有 kernel_size 作为刻度（线性刻度）
+    ax.set_xticks(kernel_sizes)
+    ax.set_xticklabels([str(k) for k in kernel_sizes])
+    ax.tick_params(axis='x', rotation=45)
+    
+    # 添加网格
+    ax.grid(True, alpha=0.3)
 
 def parse_benchmark_name(name):
     """
@@ -67,9 +124,23 @@ def parse_benchmark_json(json_file_path):
         if not parsed:
             continue
         
-        # 获取性能数据
-        time_mean = benchmark.get('cpu_time', 0) / 1000.0  # 转换为毫秒
-        time_std = benchmark.get('cpu_time_std', 0) / 1000.0
+        # 获取性能数据和时间单位
+        time_mean = benchmark.get('cpu_time', 0)
+        time_std = benchmark.get('cpu_time_std', 0)
+        time_unit = benchmark.get('time_unit', 'us')  # 默认微秒
+        
+        # 根据时间单位转换为毫秒
+        if time_unit == 'ns':  # 纳秒
+            time_mean /= 1000000.0
+            time_std /= 1000000.0
+        elif time_unit == 'us':  # 微秒
+            time_mean /= 1000.0
+            time_std /= 1000.0
+        elif time_unit == 'ms':  # 毫秒
+            pass  # 已经是毫秒，不需要转换
+        elif time_unit == 's':  # 秒
+            time_mean *= 1000.0
+            time_std *= 1000.0
         
         result = {
             'implementation': parsed['implementation'],
@@ -78,6 +149,7 @@ def parse_benchmark_json(json_file_path):
             'kernel_size': parsed['kernel_size'],
             'time_mean': time_mean,
             'time_std': time_std,
+            'time_unit': time_unit,  # 保留原始时间单位
             'name': name  # 保留原始名称用于调试
         }
         
@@ -133,10 +205,13 @@ def plot_performance_curves(results, output_dir="plots"):
             ax.set_xlabel('Kernel Size')
             ax.set_ylabel('执行时间 (ms)')
             ax.set_title(f'{se_shape} 形状')
-            ax.grid(True, alpha=0.3)
             ax.legend()
-            ax.set_xscale('log')
+            # 只保留 y 轴的对数刻度，x 轴使用线性刻度
             ax.set_yscale('log')
+            
+            # 设置更好的 kernel size 刻度显示
+            kernel_sizes = sorted(data['kernel_size'].unique()) if len(data) > 0 else []
+            setup_kernel_size_ticks(ax, kernel_sizes)
         
         # 隐藏多余的子图
         for i in range(len(se_shapes), 4):
@@ -153,10 +228,11 @@ def plot_performance_curves(results, output_dir="plots"):
 
 def plot_comprehensive_comparison(df, output_dir):
     """绘制综合对比图"""
-    # 按实现方式分组的平均性能
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    # 创建更详细的对比图
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    fig.suptitle('综合性能对比分析', fontsize=16, fontweight='bold')
     
-    # 图1: 不同实现方式的平均性能
+    # 图1: 不同实现方式的总体平均性能
     implementations = df['implementation'].unique()
     avg_times = []
     impl_names = []
@@ -169,8 +245,9 @@ def plot_comprehensive_comparison(df, output_dir):
     
     bars1 = ax1.bar(impl_names, avg_times, color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'])
     ax1.set_ylabel('平均执行时间 (ms)')
-    ax1.set_title('不同实现方式的平均性能')
+    ax1.set_title('总体平均性能\n(所有操作、形状、核大小的平均)')
     ax1.grid(True, alpha=0.3)
+    ax1.tick_params(axis='x', rotation=45)
     
     # 添加数值标签
     for bar, time in zip(bars1, avg_times):
@@ -178,10 +255,36 @@ def plot_comprehensive_comparison(df, output_dir):
         ax1.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
                 f'{time:.2f}', ha='center', va='bottom')
     
-    # 图2: 不同 kernel_size 的性能对比
-    kernel_sizes = sorted(df['kernel_size'].unique())
-    implementations = df['implementation'].unique()
+    # 图2: 按操作类型分组的平均性能
+    operations = df['operation'].unique()
+    op_data = []
+    for op in operations:
+        op_avg = []
+        for impl in implementations:
+            impl_op_data = df[(df['implementation'] == impl) & (df['operation'] == op)]
+            if len(impl_op_data) > 0:
+                op_avg.append(impl_op_data['time_mean'].mean())
+            else:
+                op_avg.append(0)
+        op_data.append(op_avg)
     
+    x = np.arange(len(implementations))
+    width = 0.12
+    colors = ['#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2']
+    
+    for i, (op, data) in enumerate(zip(operations, op_data)):
+        ax2.bar(x + i * width, data, width, label=op, color=colors[i % len(colors)])
+    
+    ax2.set_xlabel('实现方式')
+    ax2.set_ylabel('平均执行时间 (ms)')
+    ax2.set_title('按操作类型分组的平均性能')
+    ax2.set_xticks(x + width * (len(operations) - 1) / 2)
+    ax2.set_xticklabels(implementations, rotation=45)
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    
+    # 图3: 按核大小分组的性能趋势
+    kernel_sizes = sorted(df['kernel_size'].unique())
     for impl in implementations:
         impl_data = df[df['implementation'] == impl]
         avg_times_by_size = []
@@ -194,16 +297,46 @@ def plot_comprehensive_comparison(df, output_dir):
             else:
                 avg_times_by_size.append(np.nan)
         
-        ax2.plot(kernel_sizes, avg_times_by_size, marker='o', linewidth=2, 
+        ax3.plot(kernel_sizes, avg_times_by_size, marker='o', linewidth=2, 
                 markersize=6, label=impl)
     
-    ax2.set_xlabel('Kernel Size')
-    ax2.set_ylabel('平均执行时间 (ms)')
-    ax2.set_title('不同 Kernel Size 的性能对比')
-    ax2.grid(True, alpha=0.3)
-    ax2.legend()
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
+    ax3.set_xlabel('Kernel Size')
+    ax3.set_ylabel('平均执行时间 (ms)')
+    ax3.set_title('不同核大小的性能趋势\n(所有操作和形状的平均)')
+    ax3.legend()
+    # 只保留 y 轴的对数刻度，x 轴使用线性刻度
+    ax3.set_yscale('log')
+    
+    # 设置更好的 kernel size 刻度显示
+    setup_kernel_size_ticks(ax3, kernel_sizes)
+    
+    # 图4: 按形状分组的平均性能
+    se_shapes = df['se_shape'].unique()
+    shape_data = []
+    for shape in se_shapes:
+        shape_avg = []
+        for impl in implementations:
+            impl_shape_data = df[(df['implementation'] == impl) & (df['se_shape'] == shape)]
+            if len(impl_shape_data) > 0:
+                shape_avg.append(impl_shape_data['time_mean'].mean())
+            else:
+                shape_avg.append(0)
+        shape_data.append(shape_avg)
+    
+    x = np.arange(len(implementations))
+    width = 0.25
+    shape_colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
+    
+    for i, (shape, data) in enumerate(zip(se_shapes, shape_data)):
+        ax4.bar(x + i * width, data, width, label=shape, color=shape_colors[i % len(shape_colors)])
+    
+    ax4.set_xlabel('实现方式')
+    ax4.set_ylabel('平均执行时间 (ms)')
+    ax4.set_title('按结构元素形状分组的平均性能')
+    ax4.set_xticks(x + width)
+    ax4.set_xticklabels(implementations, rotation=45)
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
     
     plt.tight_layout()
     plt.savefig(f'{output_dir}/comprehensive_comparison.png', dpi=300, bbox_inches='tight')
@@ -211,6 +344,9 @@ def plot_comprehensive_comparison(df, output_dir):
 
 def generate_summary_report(results, output_dir):
     """生成汇总报告"""
+    # 确保输出目录存在
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    
     df = pd.DataFrame(results)
     
     # 按实现方式分组的统计
@@ -246,6 +382,9 @@ def main():
     
     args = parser.parse_args()
     
+    # 设置字体配置，避免警告
+    setup_matplotlib_fonts()
+    
     # 检查输入文件
     if not Path(args.json_file).exists():
         print(f"错误: 找不到文件 {args.json_file}")
@@ -271,7 +410,7 @@ def main():
             print(f"     -> operation: {result['operation']}")
             print(f"     -> se_shape: {result['se_shape']}")
             print(f"     -> kernel_size: {result['kernel_size']}")
-            print(f"     -> time: {result['time_mean']:.2f} ms")
+            print(f"     -> time: {result['time_mean']:.2f} ms (原始单位: {result['time_unit']})")
         
         # 生成汇总报告
         summary, ranking = generate_summary_report(results, args.output)
@@ -295,4 +434,4 @@ def main():
         return 1
 
 if __name__ == "__main__":
-    exit(main())
+    main()
