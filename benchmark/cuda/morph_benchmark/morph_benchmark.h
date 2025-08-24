@@ -37,8 +37,9 @@ public:
     uint8_t *d_output = nullptr;
     uint8_t *d_tmp1   = nullptr;
     uint8_t *d_tmp2   = nullptr;
-    uint8_t *d_se_v1  = nullptr;
-    int2    *d_se_v2  = nullptr;
+    uint8_t *d_se_v0  = nullptr; // v0 使用 uint8_t 掩码
+    uint8_t *d_se_v1  = nullptr; // v1 使用 uint8_t 掩码
+    int2    *d_se_v2  = nullptr; // v2 使用 int2 偏移
 
     dim3         block_dim;
     cudaStream_t stream = nullptr;
@@ -53,7 +54,15 @@ void CleanupBenchmarkData();
 
 } // namespace free_kick::cuda::benchmark
 
-// CUDA v1 版本 benchmark 函数
+// CUDA v0 版本 benchmark 函数（使用新的统一接口）
+void BM_CUDA_V0_Dilate(benchmark::State &state);
+void BM_CUDA_V0_Erode(benchmark::State &state);
+void BM_CUDA_V0_Open(benchmark::State &state);
+void BM_CUDA_V0_Close(benchmark::State &state);
+void BM_CUDA_V0_TopHat(benchmark::State &state);
+void BM_CUDA_V0_BlackHat(benchmark::State &state);
+
+// CUDA v1 版本 benchmark 函数（使用新的统一接口）
 void BM_CUDA_V1_Dilate(benchmark::State &state);
 void BM_CUDA_V1_Erode(benchmark::State &state);
 void BM_CUDA_V1_Open(benchmark::State &state);
@@ -61,7 +70,7 @@ void BM_CUDA_V1_Close(benchmark::State &state);
 void BM_CUDA_V1_TopHat(benchmark::State &state);
 void BM_CUDA_V1_BlackHat(benchmark::State &state);
 
-// CUDA v2 版本 benchmark 函数
+// CUDA v2 版本 benchmark 函数（使用新的统一接口）
 void BM_CUDA_V2_Dilate(benchmark::State &state);
 void BM_CUDA_V2_Erode(benchmark::State &state);
 void BM_CUDA_V2_Open(benchmark::State &state);

@@ -8,29 +8,35 @@ using namespace free_kick::cuda::benchmark;
 
 // ==================== Benchmark 注册 ====================
 
-// CUDA V1 版本 benchmarks
-BENCHMARK(BM_CUDA_V1_Dilate)->Unit(benchmark::kMicrosecond)->UseRealTime();
-BENCHMARK(BM_CUDA_V1_Erode)->Unit(benchmark::kMicrosecond)->UseRealTime();
-BENCHMARK(BM_CUDA_V1_Open)->Unit(benchmark::kMicrosecond)->UseRealTime();
-BENCHMARK(BM_CUDA_V1_Close)->Unit(benchmark::kMicrosecond)->UseRealTime();
-BENCHMARK(BM_CUDA_V1_TopHat)->Unit(benchmark::kMicrosecond)->UseRealTime();
-BENCHMARK(BM_CUDA_V1_BlackHat)->Unit(benchmark::kMicrosecond)->UseRealTime();
-
-// CUDA V2 版本 benchmarks
-BENCHMARK(BM_CUDA_V2_Dilate)->Unit(benchmark::kMicrosecond)->UseRealTime();
-BENCHMARK(BM_CUDA_V2_Erode)->Unit(benchmark::kMicrosecond)->UseRealTime();
-BENCHMARK(BM_CUDA_V2_Open)->Unit(benchmark::kMicrosecond)->UseRealTime();
-BENCHMARK(BM_CUDA_V2_Close)->Unit(benchmark::kMicrosecond)->UseRealTime();
-BENCHMARK(BM_CUDA_V2_TopHat)->Unit(benchmark::kMicrosecond)->UseRealTime();
-BENCHMARK(BM_CUDA_V2_BlackHat)->Unit(benchmark::kMicrosecond)->UseRealTime();
-
-// OpenCV 版本 benchmarks
 BENCHMARK(BM_OpenCV_Dilate)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V0_Dilate)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V1_Dilate)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V2_Dilate)->Unit(benchmark::kMicrosecond)->UseRealTime();
+
 BENCHMARK(BM_OpenCV_Erode)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V0_Erode)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V1_Erode)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V2_Erode)->Unit(benchmark::kMicrosecond)->UseRealTime();
+
 BENCHMARK(BM_OpenCV_Open)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V0_Open)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V1_Open)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V2_Open)->Unit(benchmark::kMicrosecond)->UseRealTime();
+
 BENCHMARK(BM_OpenCV_Close)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V0_Close)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V1_Close)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V2_Close)->Unit(benchmark::kMicrosecond)->UseRealTime();
+
 BENCHMARK(BM_OpenCV_TopHat)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V0_TopHat)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V1_TopHat)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V2_TopHat)->Unit(benchmark::kMicrosecond)->UseRealTime();
+
 BENCHMARK(BM_OpenCV_BlackHat)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V0_BlackHat)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V1_BlackHat)->Unit(benchmark::kMicrosecond)->UseRealTime();
+BENCHMARK(BM_CUDA_V2_BlackHat)->Unit(benchmark::kMicrosecond)->UseRealTime();
 
 int main(int argc, char **argv)
 {
