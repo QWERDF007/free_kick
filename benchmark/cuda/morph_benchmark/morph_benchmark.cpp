@@ -1,8 +1,5 @@
 #include "morph_benchmark.h"
 
-#include "morphology_cuda_v1.h"
-#include "morphology_cuda_v2.h"
-
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -54,8 +51,8 @@ MorphBenchmarkData::~MorphBenchmarkData()
     cudaFree(d_output);
     cudaFree(d_tmp1);
     cudaFree(d_tmp2);
-    if (d_se_v1)
-        cudaFree(d_se_v1);
+    if (d_se_v0)
+        cudaFree(d_se_v0);
     if (d_se_v2)
         cudaFree(d_se_v2);
 }
@@ -70,15 +67,15 @@ void MorphBenchmarkData::getStructuringElement()
     anchor_x = se_w / 2;
     anchor_y = se_h / 2;
 
-    // 为 v1 准备（直接复制掩码）
-    if (d_se_v1)
-        cudaFree(d_se_v1);
+    // 为 v0 准备（直接复制掩码）
+    if (d_se_v0)
+        cudaFree(d_se_v0);
     size_t se_bytes = se_w * se_h * sizeof(uint8_t);
-    cudaMalloc(&d_se_v1, se_bytes);
-    cudaMemcpy(d_se_v1, kernel.data, se_bytes, cudaMemcpyHostToDevice);
+    cudaMalloc(&d_se_v0, se_bytes);
+    cudaMemcpy(d_se_v0, kernel.data, se_bytes, cudaMemcpyHostToDevice);
 
     // 为 v2 准备（构建偏移列表）
-    auto offsets = free_kick::cuda::ops::v2::build_se_offsets(kernel.data, se_w, se_h, anchor_x, anchor_y);
+    auto offsets = free_kick::cuda::ops::buildOffsetList(kernel.data, se_w, se_h, anchor_x, anchor_y);
     n_offsets    = static_cast<int>(offsets.size());
 
     if (d_se_v2)
@@ -102,251 +99,9 @@ void CleanupBenchmarkData()
 
 } // namespace free_kick::cuda::benchmark
 
-// ==================== CUDA V1 Benchmark 函数 ====================
+// ==================== OpenCV 版本模板函数实现 ====================
 
-void BM_CUDA_V1_Dilate(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
-
-    for (auto _ : state)
-    {
-        free_kick::cuda::ops::v1::morphologyEx(data.d_input, data.d_output, data.d_tmp1, data.d_tmp2, data.width,
-                                               data.height, data.stride, cv::MORPH_DILATE, data.d_se_v1, data.se_w,
-                                               data.se_h, data.anchor_x, data.anchor_y, data.block_dim, data.stream);
-        cudaStreamSynchronize(data.stream);
-    }
-
-    double pixels_processed      = static_cast<double>(data.width * data.height);
-    state.counters["pixels/sec"] = benchmark::Counter(pixels_processed, benchmark::Counter::kIsRate);
-    state.counters["MPix/sec"]   = benchmark::Counter(pixels_processed / 1e6, benchmark::Counter::kIsRate);
-}
-
-void BM_CUDA_V1_Erode(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
-
-    for (auto _ : state)
-    {
-        free_kick::cuda::ops::v1::morphologyEx(data.d_input, data.d_output, data.d_tmp1, data.d_tmp2, data.width,
-                                               data.height, data.stride, cv::MORPH_ERODE, data.d_se_v1, data.se_w,
-                                               data.se_h, data.anchor_x, data.anchor_y, data.block_dim, data.stream);
-        cudaStreamSynchronize(data.stream);
-    }
-}
-
-void BM_CUDA_V1_Open(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
-
-    for (auto _ : state)
-    {
-        free_kick::cuda::ops::v1::morphologyEx(data.d_input, data.d_output, data.d_tmp1, data.d_tmp2, data.width,
-                                               data.height, data.stride, cv::MORPH_OPEN, data.d_se_v1, data.se_w,
-                                               data.se_h, data.anchor_x, data.anchor_y, data.block_dim, data.stream);
-        cudaStreamSynchronize(data.stream);
-    }
-}
-
-void BM_CUDA_V1_Close(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
-
-    for (auto _ : state)
-    {
-        free_kick::cuda::ops::v1::morphologyEx(data.d_input, data.d_output, data.d_tmp1, data.d_tmp2, data.width,
-                                               data.height, data.stride, cv::MORPH_CLOSE, data.d_se_v1, data.se_w,
-                                               data.se_h, data.anchor_x, data.anchor_y, data.block_dim, data.stream);
-        cudaStreamSynchronize(data.stream);
-    }
-}
-
-void BM_CUDA_V1_TopHat(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
-
-    for (auto _ : state)
-    {
-        free_kick::cuda::ops::v1::morphologyEx(data.d_input, data.d_output, data.d_tmp1, data.d_tmp2, data.width,
-                                               data.height, data.stride, cv::MORPH_TOPHAT, data.d_se_v1, data.se_w,
-                                               data.se_h, data.anchor_x, data.anchor_y, data.block_dim, data.stream);
-        cudaStreamSynchronize(data.stream);
-    }
-}
-
-void BM_CUDA_V1_BlackHat(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
-
-    for (auto _ : state)
-    {
-        free_kick::cuda::ops::v1::morphologyEx(data.d_input, data.d_output, data.d_tmp1, data.d_tmp2, data.width,
-                                               data.height, data.stride, cv::MORPH_BLACKHAT, data.d_se_v1, data.se_w,
-                                               data.se_h, data.anchor_x, data.anchor_y, data.block_dim, data.stream);
-        cudaStreamSynchronize(data.stream);
-    }
-}
-
-// ==================== CUDA V2 Benchmark 函数 ====================
-
-void BM_CUDA_V2_Dilate(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
-
-    for (auto _ : state)
-    {
-        free_kick::cuda::ops::v2::morphologyEx(data.d_input, data.d_output, data.d_tmp1, data.d_tmp2, data.width,
-                                               data.height, data.stride, cv::MORPH_DILATE, data.d_se_v2, data.n_offsets,
-                                               data.se_w, data.se_h, data.anchor_x, data.anchor_y, data.block_dim,
-                                               data.stream);
-        cudaStreamSynchronize(data.stream);
-    }
-}
-
-void BM_CUDA_V2_Erode(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
-
-    for (auto _ : state)
-    {
-        free_kick::cuda::ops::v2::morphologyEx(data.d_input, data.d_output, data.d_tmp1, data.d_tmp2, data.width,
-                                               data.height, data.stride, cv::MORPH_ERODE, data.d_se_v2, data.n_offsets,
-                                               data.se_w, data.se_h, data.anchor_x, data.anchor_y, data.block_dim,
-                                               data.stream);
-        cudaStreamSynchronize(data.stream);
-    }
-}
-
-void BM_CUDA_V2_Open(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
-
-    for (auto _ : state)
-    {
-        free_kick::cuda::ops::v2::morphologyEx(data.d_input, data.d_output, data.d_tmp1, data.d_tmp2, data.width,
-                                               data.height, data.stride, cv::MORPH_OPEN, data.d_se_v2, data.n_offsets,
-                                               data.se_w, data.se_h, data.anchor_x, data.anchor_y, data.block_dim,
-                                               data.stream);
-        cudaStreamSynchronize(data.stream);
-    }
-}
-
-void BM_CUDA_V2_Close(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
-
-    for (auto _ : state)
-    {
-        free_kick::cuda::ops::v2::morphologyEx(data.d_input, data.d_output, data.d_tmp1, data.d_tmp2, data.width,
-                                               data.height, data.stride, cv::MORPH_CLOSE, data.d_se_v2, data.n_offsets,
-                                               data.se_w, data.se_h, data.anchor_x, data.anchor_y, data.block_dim,
-                                               data.stream);
-        cudaStreamSynchronize(data.stream);
-    }
-}
-
-void BM_CUDA_V2_TopHat(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
-
-    for (auto _ : state)
-    {
-        free_kick::cuda::ops::v2::morphologyEx(data.d_input, data.d_output, data.d_tmp1, data.d_tmp2, data.width,
-                                               data.height, data.stride, cv::MORPH_TOPHAT, data.d_se_v2, data.n_offsets,
-                                               data.se_w, data.se_h, data.anchor_x, data.anchor_y, data.block_dim,
-                                               data.stream);
-        cudaStreamSynchronize(data.stream);
-    }
-}
-
-void BM_CUDA_V2_BlackHat(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto &data = *free_kick::cuda::benchmark::g_benchmark_data;
-
-    for (auto _ : state)
-    {
-        free_kick::cuda::ops::v2::morphologyEx(data.d_input, data.d_output, data.d_tmp1, data.d_tmp2, data.width,
-                                               data.height, data.stride, cv::MORPH_BLACKHAT, data.d_se_v2,
-                                               data.n_offsets, data.se_w, data.se_h, data.anchor_x, data.anchor_y,
-                                               data.block_dim, data.stream);
-        cudaStreamSynchronize(data.stream);
-    }
-}
-
-// ==================== OpenCV Benchmark 函数 ====================
-
-void BM_OpenCV_Dilate(benchmark::State &state)
+void BM_OpenCV_Morphology(benchmark::State &state)
 {
     if (!free_kick::cuda::benchmark::g_benchmark_data)
     {
@@ -357,94 +112,11 @@ void BM_OpenCV_Dilate(benchmark::State &state)
     auto     &data = *free_kick::cuda::benchmark::g_benchmark_data;
     cv::Point anchor(data.anchor_x, data.anchor_y);
 
-    for (auto _ : state)
-    {
-        cv::morphologyEx(data.test_image, data.output_image, cv::MORPH_DILATE, data.kernel, anchor);
-    }
-}
-
-void BM_OpenCV_Erode(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto     &data = *free_kick::cuda::benchmark::g_benchmark_data;
-    cv::Point anchor(data.anchor_x, data.anchor_y);
+    // 从 benchmark 参数中获取操作类型
+    int morph_op = state.range(0);
 
     for (auto _ : state)
     {
-        cv::erode(data.test_image, data.output_image, data.kernel, anchor);
-        cv::morphologyEx(data.test_image, data.output_image, cv::MORPH_ERODE, data.kernel, anchor);
-    }
-}
-
-void BM_OpenCV_Open(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto     &data = *free_kick::cuda::benchmark::g_benchmark_data;
-    cv::Point anchor(data.anchor_x, data.anchor_y);
-
-    for (auto _ : state)
-    {
-        cv::morphologyEx(data.test_image, data.output_image, cv::MORPH_OPEN, data.kernel, anchor);
-    }
-}
-
-void BM_OpenCV_Close(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto     &data = *free_kick::cuda::benchmark::g_benchmark_data;
-    cv::Point anchor(data.anchor_x, data.anchor_y);
-
-    for (auto _ : state)
-    {
-        cv::morphologyEx(data.test_image, data.output_image, cv::MORPH_CLOSE, data.kernel, anchor);
-    }
-}
-
-void BM_OpenCV_TopHat(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto     &data = *free_kick::cuda::benchmark::g_benchmark_data;
-    cv::Point anchor(data.anchor_x, data.anchor_y);
-
-    for (auto _ : state)
-    {
-        cv::morphologyEx(data.test_image, data.output_image, cv::MORPH_TOPHAT, data.kernel, anchor);
-    }
-}
-
-void BM_OpenCV_BlackHat(benchmark::State &state)
-{
-    if (!free_kick::cuda::benchmark::g_benchmark_data)
-    {
-        state.SkipWithError("Benchmark data not initialized");
-        return;
-    }
-
-    auto     &data = *free_kick::cuda::benchmark::g_benchmark_data;
-    cv::Point anchor(data.anchor_x, data.anchor_y);
-
-    for (auto _ : state)
-    {
-        cv::morphologyEx(data.test_image, data.output_image, cv::MORPH_BLACKHAT, data.kernel, anchor);
+        cv::morphologyEx(data.test_image, data.output_image, morph_op, data.kernel, anchor);
     }
 }
