@@ -98,6 +98,7 @@ public:
         CUDA_CHECK(cudaMalloc(&d_se_v1_, se_v1_bytes));
         CUDA_CHECK(cudaMemcpy(d_se_v1_, kernel_.data, se_v1_bytes, cudaMemcpyHostToDevice));
 
+        // 准备偏移列表
         if (d_se_v2_)
             cudaFree(d_se_v2_);
         auto offsets = buildOffsetList(kernel_.data, se_w_, se_h_, anchor_x_, anchor_y_);
@@ -185,27 +186,25 @@ public:
         auto cuda_v0_times = measureCudaExecutionTime(
             [this, op]
             {
-                morphologyEx<v0::DirectAccessStrategy, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
-                                                                img_stride_, op, d_se_v1_, 0, se_w_, se_h_, anchor_x_,
-                                                                anchor_y_, stream_);
+                morphologyEx<v0::DirectAccessExecutor<uint8_t>, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_,
+                                                                         img_h_, img_stride_, op, d_se_v1_, 0, se_w_,
+                                                                         se_h_, anchor_x_, anchor_y_, stream_);
             });
 
         auto cuda_v1_times = measureCudaExecutionTime(
             [this, op]
             {
-                morphologyEx<v1::SharedMemoryStrategy, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
-                                                                img_stride_, op, d_se_v1_, 0, se_w_, se_h_, anchor_x_,
-                                                                anchor_y_, stream_);
+                morphologyEx<v1::SharedMemoryExecutor<uint8_t>, uint8_t>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_,
+                                                                         img_h_, img_stride_, op, d_se_v1_, 0, se_w_,
+                                                                         se_h_, anchor_x_, anchor_y_, stream_);
             });
 
         auto cuda_v2_times = measureCudaExecutionTime(
             [this, op]
             {
-                // 为v2策略准备偏移列表
-
-                morphologyEx<v2::OffsetOptimizedStrategy, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
-                                                                img_stride_, op, d_se_v2_, n_offsets_, se_w_, se_h_,
-                                                                anchor_x_, anchor_y_, stream_);
+                morphologyEx<v2::OffsetOptimizedExecutor<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_,
+                                                                         img_h_, img_stride_, op, d_se_v2_, n_offsets_,
+                                                                         se_w_, se_h_, anchor_x_, anchor_y_, stream_);
             });
 
         // 获取操作名称
