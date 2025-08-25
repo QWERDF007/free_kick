@@ -165,66 +165,193 @@ def plot_performance_curves(results, output_dir="plots"):
     # 转换为 DataFrame 便于分析
     df = pd.DataFrame(results)
     
+    # 获取所有的结构元素形状
+    se_shapes = df['se_shape'].unique()
+    
+    # 为每个 se_shape 单独分析和绘制
+    for se_shape in se_shapes:
+        # 为每个形状创建单独的目录
+        shape_dir = Path(output_dir) / se_shape
+        shape_dir.mkdir(exist_ok=True)
+        
+        print(f"正在处理 {se_shape} 形状的数据...")
+        
+        # 筛选该形状的数据
+        shape_data = df[df['se_shape'] == se_shape]
+        
+        # 绘制该形状下所有操作的性能对比
+        plot_shape_performance(shape_data, shape_dir, se_shape)
+        
+        # 为该形状生成综合对比图
+        plot_shape_comprehensive_comparison(shape_data, shape_dir, se_shape)
+        
+        # 为该形状生成汇总报告
+        generate_shape_summary_report(shape_data, shape_dir, se_shape)
+    
+    # 绘制总体综合对比图（所有形状）
+    plot_comprehensive_comparison(df, output_dir)
+
+def plot_shape_performance(shape_data, output_dir, se_shape):
+    """为特定形状绘制性能曲线"""
     # 按操作类型分组绘制
-    operations = df['operation'].unique()
+    operations = shape_data['operation'].unique()
     
     for operation in operations:
-        fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-        fig.suptitle(f'{operation} 操作性能对比', fontsize=16, fontweight='bold')
+        fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+        fig.suptitle(f'{se_shape} 形状 - {operation} 操作性能对比', fontsize=16, fontweight='bold')
         
-        # 按结构元素形状分组
-        se_shapes = df[df['operation'] == operation]['se_shape'].unique()
+        # 筛选该操作的数据
+        op_data = shape_data[shape_data['operation'] == operation]
         
-        for i, se_shape in enumerate(se_shapes):
-            if i >= 4:  # 最多4个子图
-                break
+        # 按实现方式分组
+        implementations = op_data['implementation'].unique()
+        
+        for impl in implementations:
+            impl_data = op_data[op_data['implementation'] == impl]
+            if len(impl_data) > 0:
+                # 按 kernel_size 排序
+                impl_data = impl_data.sort_values('kernel_size')
                 
-            row = i // 2
-            col = i % 2
-            ax = axes[row, col]
-            
-            # 筛选数据
-            mask = (df['operation'] == operation) & (df['se_shape'] == se_shape)
-            data = df[mask]
-            
-            # 按实现方式分组
-            implementations = data['implementation'].unique()
-            
-            for impl in implementations:
-                impl_data = data[data['implementation'] == impl]
-                if len(impl_data) > 0:
-                    # 按 kernel_size 排序
-                    impl_data = impl_data.sort_values('kernel_size')
-                    
-                    # 绘制曲线
-                    ax.errorbar(impl_data['kernel_size'], impl_data['time_mean'], 
-                               yerr=impl_data['time_std'], 
-                               marker='o', linewidth=2, markersize=6,
-                               label=impl, capsize=4)
-            
-            ax.set_xlabel('Kernel Size')
-            ax.set_ylabel('执行时间 (ms)')
-            ax.set_title(f'{se_shape} 形状')
-            ax.legend()
-            # 只保留 y 轴的对数刻度，x 轴使用线性刻度
-            ax.set_yscale('log')
-            
-            # 设置更好的 kernel size 刻度显示
-            kernel_sizes = sorted(data['kernel_size'].unique()) if len(data) > 0 else []
-            setup_kernel_size_ticks(ax, kernel_sizes)
+                # 绘制曲线
+                ax.errorbar(impl_data['kernel_size'], impl_data['time_mean'], 
+                           yerr=impl_data['time_std'], 
+                           marker='o', linewidth=2, markersize=8,
+                           label=impl, capsize=4)
         
-        # 隐藏多余的子图
-        for i in range(len(se_shapes), 4):
-            row = i // 2
-            col = i % 2
-            axes[row, col].set_visible(False)
+        ax.set_xlabel('Kernel Size')
+        ax.set_ylabel('执行时间 (ms)')
+        ax.set_title(f'{se_shape} 形状 - {operation} 操作')
+        ax.legend()
+        # 只保留 y 轴的对数刻度，x 轴使用线性刻度
+        ax.set_yscale('log')
+        
+        # 设置更好的 kernel size 刻度显示
+        kernel_sizes = sorted(op_data['kernel_size'].unique()) if len(op_data) > 0 else []
+        setup_kernel_size_ticks(ax, kernel_sizes)
         
         plt.tight_layout()
         plt.savefig(f'{output_dir}/{operation}_performance.png', dpi=300, bbox_inches='tight')
         plt.close()
+
+def plot_shape_comprehensive_comparison(shape_data, output_dir, se_shape):
+    """为特定形状绘制综合对比图"""
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 6))
+    fig.suptitle(f'{se_shape} 形状 - 综合性能对比分析', fontsize=16, fontweight='bold')
     
-    # 绘制综合对比图
-    plot_comprehensive_comparison(df, output_dir)
+    # 图1: 不同实现方式的平均性能
+    implementations = shape_data['implementation'].unique()
+    avg_times = []
+    impl_names = []
+    
+    for impl in implementations:
+        impl_data = shape_data[shape_data['implementation'] == impl]
+        avg_time = impl_data['time_mean'].mean()
+        avg_times.append(avg_time)
+        impl_names.append(impl)
+    
+    bars1 = ax1.bar(impl_names, avg_times, color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'])
+    ax1.set_ylabel('平均执行时间 (ms)')
+    ax1.set_title(f'{se_shape} 形状 - 总体平均性能')
+    ax1.grid(True, alpha=0.3)
+    ax1.tick_params(axis='x', rotation=45)
+    
+    # 添加数值标签
+    for bar, time in zip(bars1, avg_times):
+        height = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
+                f'{time:.2f}', ha='center', va='bottom')
+    
+    # 图2: 按操作类型分组的平均性能
+    operations = shape_data['operation'].unique()
+    op_data = []
+    for op in operations:
+        op_avg = []
+        for impl in implementations:
+            impl_op_data = shape_data[(shape_data['implementation'] == impl) & (shape_data['operation'] == op)]
+            if len(impl_op_data) > 0:
+                op_avg.append(impl_op_data['time_mean'].mean())
+            else:
+                op_avg.append(0)
+        op_data.append(op_avg)
+    
+    x = np.arange(len(implementations))
+    width = 0.12
+    colors = ['#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2']
+    
+    for i, (op, data) in enumerate(zip(operations, op_data)):
+        ax2.bar(x + i * width, data, width, label=op, color=colors[i % len(colors)])
+    
+    ax2.set_xlabel('实现方式')
+    ax2.set_ylabel('平均执行时间 (ms)')
+    ax2.set_title(f'{se_shape} 形状 - 按操作类型分组的平均性能')
+    ax2.set_xticks(x + width * (len(operations) - 1) / 2)
+    ax2.set_xticklabels(implementations, rotation=45)
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    
+    # 图3: 按核大小分组的性能趋势
+    kernel_sizes = sorted(shape_data['kernel_size'].unique())
+    for impl in implementations:
+        impl_data = shape_data[shape_data['implementation'] == impl]
+        avg_times_by_size = []
+        
+        for size in kernel_sizes:
+            size_data = impl_data[impl_data['kernel_size'] == size]
+            if len(size_data) > 0:
+                avg_time = size_data['time_mean'].mean()
+                avg_times_by_size.append(avg_time)
+            else:
+                avg_times_by_size.append(np.nan)
+        
+        ax3.plot(kernel_sizes, avg_times_by_size, marker='o', linewidth=2, 
+                markersize=6, label=impl)
+    
+    ax3.set_xlabel('Kernel Size')
+    ax3.set_ylabel('平均执行时间 (ms)')
+    ax3.set_title(f'{se_shape} 形状 - 不同核大小的性能趋势')
+    ax3.legend()
+    # 只保留 y 轴的对数刻度，x 轴使用线性刻度
+    ax3.set_yscale('log')
+    
+    # 设置更好的 kernel size 刻度显示
+    setup_kernel_size_ticks(ax3, kernel_sizes)
+    
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/comprehensive_comparison.png', dpi=300, bbox_inches='tight')
+    plt.close()
+
+def generate_shape_summary_report(shape_data, output_dir, se_shape):
+    """为特定形状生成汇总报告"""
+    # 按实现方式分组的统计
+    summary = shape_data.groupby('implementation').agg({
+        'time_mean': ['mean', 'std', 'min', 'max'],
+        'kernel_size': 'count'
+    }).round(4)
+    
+    # 保存汇总报告
+    summary.to_csv(f'{output_dir}/summary_report.csv')
+    
+    # 生成性能排名
+    avg_performance = shape_data.groupby('implementation')['time_mean'].mean().sort_values()
+    performance_ranking = pd.DataFrame({
+        'Implementation': avg_performance.index,
+        'Average Time (ms)': avg_performance.values,
+        'Rank': range(1, len(avg_performance) + 1)
+    })
+    
+    performance_ranking.to_csv(f'{output_dir}/performance_ranking.csv', index=False)
+    
+    # 按操作类型的性能统计
+    operation_summary = shape_data.groupby(['implementation', 'operation']).agg({
+        'time_mean': ['mean', 'std', 'min', 'max']
+    }).round(4)
+    
+    operation_summary.to_csv(f'{output_dir}/operation_summary.csv')
+    
+    print(f"  {se_shape} 形状汇总报告已生成:")
+    print(f"  - 详细统计: {output_dir}/summary_report.csv")
+    print(f"  - 性能排名: {output_dir}/performance_ranking.csv")
+    print(f"  - 操作统计: {output_dir}/operation_summary.csv")
 
 def plot_comprehensive_comparison(df, output_dir):
     """绘制综合对比图"""
