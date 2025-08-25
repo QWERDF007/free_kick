@@ -218,6 +218,22 @@ public:
                                                 d_se_i2_, n_offsets_, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
             });
 
+        auto cuda_v5_times = measureCudaExecutionTime(
+            [this, shape, op]
+            {
+                if (shape == cv::MORPH_RECT)
+                {
+                    morphologyEx<v5<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_,
+                                                    op, nullptr, 0, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
+                }
+                else
+                {
+                    morphologyEx<v5<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_,
+                                                    op, d_se_i2_, n_offsets_, se_w_, se_h_, anchor_x_, anchor_y_,
+                                                    stream_);
+                }
+            });
+
         // 获取操作名称
         std::string op_name;
         switch (op)
@@ -252,6 +268,7 @@ public:
             {"v2", cuda_v2_times},
             {"v3", cuda_v3_times},
             {"v4", cuda_v4_times},
+            {"v5", cuda_v5_times},
         };
 
         // 提取时间数据 [h2d_ms, d2h_ms, kernel_ms, cuda_total_ms, wall_ms]

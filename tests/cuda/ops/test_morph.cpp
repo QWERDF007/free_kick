@@ -19,7 +19,7 @@ class MorphologyCudaTest : public ::testing::TestWithParam<MorphTestParams>
 protected:
     void SetUp() override
     {
-        std::string path = "D:/Project/dianjiao/2025_08_18/picture_1_2025_08_18_18_02_25_059.png";
+        std::string path = "F:/Projects/morph_test/2025_08_18/picture_1_2025_08_18_18_02_25_059.png";
         test_image_      = cv::imread(path, cv::IMREAD_GRAYSCALE);
         // // 创建一个测试图像（4096x2048，包含各种几何形状）
         // test_image_ = cv::Mat::zeros(4096, 2048, CV_8UC1);
@@ -218,6 +218,27 @@ protected:
         return result;
     }
 
+    // 使用 CUDA v5 进行计算
+    cv::Mat computeCUDAv5Morph(int shape, int op)
+    {
+        if (shape == cv::MORPH_RECT)
+        {
+            morphologyEx<v5<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_, op,
+                                            nullptr, 0, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
+        }
+        else
+        {
+            morphologyEx<v5<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_, op,
+                                            d_se_i2_, n_offsets_, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
+        }
+
+        CUDA_CHECK(cudaStreamSynchronize(stream_));
+
+        cv::Mat result(img_h_, img_w_, CV_8UC1);
+        CUDA_CHECK(cudaMemcpy(result.data, d_output_, img_h_ * img_stride_, cudaMemcpyDeviceToHost));
+        return result;
+    }
+
     // 计算两个图像之间的差异
     double computeImageDifference(const cv::Mat &img1, const cv::Mat &img2)
     {
@@ -266,6 +287,7 @@ TEST_P(MorphologyCudaTest, CompareV1V2WithOpenCV)
             cv::Mat cuda_v2_result = computeCUDAv2Morph(op);
             cv::Mat cuda_v3_result = computeCUDAv3Morph(op);
             cv::Mat cuda_v4_result = computeCUDAv4Morph(op);
+            cv::Mat cuda_v5_result = computeCUDAv5Morph(shape, op);
             // 验证结果不为空且尺寸正确
             EXPECT_FALSE(opencv_result.empty());
             EXPECT_FALSE(cuda_v0_result.empty());
@@ -273,22 +295,26 @@ TEST_P(MorphologyCudaTest, CompareV1V2WithOpenCV)
             EXPECT_FALSE(cuda_v2_result.empty());
             EXPECT_FALSE(cuda_v3_result.empty());
             EXPECT_FALSE(cuda_v4_result.empty());
+            EXPECT_FALSE(cuda_v5_result.empty());
             EXPECT_EQ(opencv_result.size(), cuda_v0_result.size());
             EXPECT_EQ(opencv_result.size(), cuda_v1_result.size());
             EXPECT_EQ(opencv_result.size(), cuda_v2_result.size());
             EXPECT_EQ(opencv_result.size(), cuda_v3_result.size());
             EXPECT_EQ(opencv_result.size(), cuda_v4_result.size());
+            EXPECT_EQ(opencv_result.size(), cuda_v5_result.size());
             // 比较结果
             double diff_v0 = computeImageDifference(opencv_result, cuda_v0_result);
             double diff_v1 = computeImageDifference(opencv_result, cuda_v1_result);
             double diff_v2 = computeImageDifference(opencv_result, cuda_v2_result);
             double diff_v3 = computeImageDifference(opencv_result, cuda_v3_result);
             double diff_v4 = computeImageDifference(opencv_result, cuda_v4_result);
+            double diff_v5 = computeImageDifference(opencv_result, cuda_v5_result);
             EXPECT_LT(diff_v0, 1.0) << "CUDA v0 difference too large, kernel size: " << p.kernel_size;
             EXPECT_LT(diff_v1, 1.0) << "CUDA v1 difference too large, kernel size: " << p.kernel_size;
             EXPECT_LT(diff_v2, 1.0) << "CUDA v2 difference too large, kernel size: " << p.kernel_size;
             EXPECT_LT(diff_v3, 1.0) << "CUDA v3 difference too large, kernel size: " << p.kernel_size;
             EXPECT_LT(diff_v4, 1.0) << "CUDA v4 difference too large, kernel size: " << p.kernel_size;
+            EXPECT_LT(diff_v5, 1.0) << "CUDA v5 difference too large, kernel size: " << p.kernel_size;
         }
     }
 }
