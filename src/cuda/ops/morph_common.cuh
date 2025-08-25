@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "opsdef.h"
+
 #include <cuda_runtime.h>
 
 #include <cstdint>

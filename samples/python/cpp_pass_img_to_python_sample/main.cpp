@@ -232,7 +232,7 @@ int main(int argc, char *argv[])
     free_kick::common::CrashHandler crash_handler;
     crash_handler.setup();
 
-    const std::string python_home = "D:/Software/anaconda3/envs/AD";
+    const std::string python_home = "E:/Softwares/Anaconda3/envs/py38";
     // 添加环境变量 PATH
 
     std::string path_env = std::string(std::getenv("PATH"));

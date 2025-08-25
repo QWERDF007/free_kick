@@ -19,7 +19,7 @@ class MorphologyCudaTest : public ::testing::TestWithParam<MorphTestParams>
 protected:
     void SetUp() override
     {
-        std::string path = "F:/Projects/morph_test/2025_08_18/picture_1_2025_08_18_18_02_25_059.png";
+        std::string path = "D:/Project/dianjiao/2025_08_18/picture_1_2025_08_18_18_02_25_059.png";
         test_image_      = cv::imread(path, cv::IMREAD_GRAYSCALE);
         // // 创建一个测试图像（4096x2048，包含各种几何形状）
         // test_image_ = cv::Mat::zeros(4096, 2048, CV_8UC1);
@@ -223,12 +223,17 @@ protected:
     {
         if (shape == cv::MORPH_RECT)
         {
-            morphologyEx<v5<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_, op,
-                                            nullptr, 0, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
+            morphologyEx<v5<uint8_t>, cv::MORPH_RECT>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                      img_stride_, op, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
+        }
+        else if (shape == cv::MORPH_CROSS)
+        {
+            morphologyEx<v5<uint8_t>, cv::MORPH_CROSS>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                       img_stride_, op, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
         }
         else
         {
-            morphologyEx<v5<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_, op,
+            morphologyEx<v4<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_, op,
                                             d_se_i2_, n_offsets_, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
         }
 

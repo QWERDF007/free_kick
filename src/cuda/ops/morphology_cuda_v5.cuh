@@ -1,41 +1,24 @@
 ﻿#pragma once
 
 #include "morph_common.cuh"
-#include "morphology_cuda_v4.cuh"
+
+#include <opencv2/opencv.hpp>
 
 namespace free_kick::cuda::ops {
 
-// v5: 共享内存 + 无分支 clamp + 偏移列表优化 + 分离横向/纵向
+// v5: 共享内存 + 无分支 clamp + 分离横向/纵向
 template<typename T>
-struct v5 : v4<T>
+struct v5
 {
     // 主要的operator()函数，组合横向和纵向处理
     // 这个版本需要外部调用方分别调用horizontal_pass和vertical_pass
-    // 或者提供分离的偏移列表
     // 这里提供一个简化的实现，假设结构元素可以分离为横向和纵向
 
     // 注意：这是一个简化实现，实际应用中需要：
-    // 1. 预处理结构元素，分离为横向和纵向偏移
-    // 2. 使用中间缓冲区进行两次传递
-    // 3. 或者提供专门的分离式调用接口
+    // 1. 使用中间缓冲区进行两次传递
 
     // 如果结构元素是可分离的（如矩形、十字形等），可以显著降低复杂度
     // 从 O(se_w * se_h) 降低到 O(se_w + se_h)
-
-    // 这里先实现原来的逻辑作为回退
-    template<typename Reducer>
-    __device__ void operator()(const Reducer &reducer, const T *__restrict__ in, T *__restrict__ out, const int img_w,
-                               const int img_h, const int img_stride, const int2 *__restrict__ d_se,
-                               const int n_offsets, const int se_w, const int se_h, const int anchor_x,
-                               const int anchor_y) const
-    {
-        v4<T>::operator()(reducer, in, out, img_w, img_h, img_stride, d_se, n_offsets, se_w, se_h, anchor_x, anchor_y);
-    }
-
-    size_t getSharedMemSize(dim3 block_dim, int se_w, int se_h, int anchor_x, int anchor_y)
-    {
-        return v4<T>::getSharedMemSize(block_dim, se_w, se_h, anchor_x, anchor_y);
-    }
 
     // --- 水平 pass ---
     template<typename Reducer>
@@ -125,6 +108,76 @@ struct v5 : v4<T>
 
         out[y * img_stride + x] = acc;
     }
+
+    // --- 十字形 pass (水平 + 垂直 + 融合) ---
+    template<typename Reducer>
+    __device__ void cross(const Reducer &reducer, const T *__restrict__ in, T *__restrict__ tmp_h,
+                          T *__restrict__ tmp_v, T *__restrict__ out, const int img_w, const int img_h,
+                          const int img_stride, const int se_w, const int se_h, const int anchor_x,
+                          const int anchor_y) const
+    {
+        // step 1: 水平 pass
+        horizontal(reducer, in, tmp_h, img_w, img_h, img_stride, se_w, anchor_x);
+        __syncthreads();
+
+        // step 2: 垂直 pass
+        vertical(reducer, in, tmp_v, img_w, img_h, img_stride, se_h, anchor_y);
+        __syncthreads();
+
+        // step 3: 融合结果（min=腐蚀，max=膨胀）
+        const int x = blockIdx.x * blockDim.x + threadIdx.x;
+        const int y = blockIdx.y * blockDim.y + threadIdx.y;
+        if (x >= img_w || y >= img_h)
+            return;
+
+        int idx  = y * img_stride + x;
+        out[idx] = reducer.reduce(tmp_h[idx], tmp_v[idx]);
+    }
 };
+
+template<typename Executor, typename T, typename Reducer>
+__global__ void separable_horizontal_kernel(const Executor &executor, const Reducer &reducer, const T *__restrict__ in,
+                                            T *__restrict__ tmp, const int img_w, const int img_h, const int img_stride,
+                                            const int se_w, const int anchor_x)
+{
+    executor.horizontal(reducer, in, tmp, img_w, img_h, img_stride, se_w, anchor_x);
+}
+
+template<typename Executor, typename T, typename Reducer>
+__global__ void separable_vertical_kernel(const Executor &executor, const Reducer &reducer, const T *__restrict__ tmp,
+                                          T *__restrict__ out, const int img_w, const int img_h, const int img_stride,
+                                          const int se_h, const int anchor_y)
+{
+    executor.vertical(reducer, tmp, out, img_w, img_h, img_stride, se_h, anchor_y);
+}
+
+template<typename Executor, typename T, typename Reducer>
+__global__ void separable_cross_kernel(const Executor &executor, const Reducer &reducer, const T *__restrict__ in,
+                                       T *__restrict__ tmp_h, T *__restrict__ tmp_v, T *__restrict__ out,
+                                       const int img_w, const int img_h, const int img_stride, const int se_w,
+                                       const int se_h, const int anchor_x, const int anchor_y)
+{
+    executor.cross(reducer, in, tmp_h, tmp_v, out, img_w, img_h, img_stride, se_w, se_h, anchor_x, anchor_y);
+}
+
+template<typename Executor, int SEShape>
+void morphologyEx(const uint8_t *d_in, uint8_t *d_out, uint8_t *d_tmp, uint8_t *d_tmp2, const int img_w,
+                  const int img_h, const int img_stride, const int op, const int se_w, const int se_h,
+                  const int anchor_x, const int anchor_y, cudaStream_t stream);
+
+// ==================== 模板显式实例化声明+导出 ====================
+template CUDA_OPS_API void morphologyEx<v5<uint8_t>, cv::MORPH_RECT>(const uint8_t *d_in, uint8_t *d_out,
+                                                                     uint8_t *d_tmp, uint8_t *d_tmp2, const int img_w,
+                                                                     const int img_h, const int img_stride,
+                                                                     const int op, const int se_w, const int se_h,
+                                                                     const int anchor_x, const int anchor_y,
+                                                                     cudaStream_t stream);
+
+template CUDA_OPS_API void morphologyEx<v5<uint8_t>, cv::MORPH_CROSS>(const uint8_t *d_in, uint8_t *d_out,
+                                                                      uint8_t *d_tmp, uint8_t *d_tmp2, const int img_w,
+                                                                      const int img_h, const int img_stride,
+                                                                      const int op, const int se_w, const int se_h,
+                                                                      const int anchor_x, const int anchor_y,
+                                                                      cudaStream_t stream);
 
 } // namespace free_kick::cuda::ops

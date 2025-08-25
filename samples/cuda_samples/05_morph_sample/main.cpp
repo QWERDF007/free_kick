@@ -223,12 +223,19 @@ public:
             {
                 if (shape == cv::MORPH_RECT)
                 {
-                    morphologyEx<v5<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_,
-                                                    op, nullptr, 0, se_w_, se_h_, anchor_x_, anchor_y_, stream_);
+                    morphologyEx<v5<uint8_t>, cv::MORPH_RECT>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                              img_stride_, op, se_w_, se_h_, anchor_x_, anchor_y_,
+                                                              stream_);
+                }
+                else if (shape == cv::MORPH_CROSS)
+                {
+                    morphologyEx<v5<uint8_t>, cv::MORPH_CROSS>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_,
+                                                               img_stride_, op, se_w_, se_h_, anchor_x_, anchor_y_,
+                                                               stream_);
                 }
                 else
                 {
-                    morphologyEx<v5<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_,
+                    morphologyEx<v4<uint8_t>, int2>(d_input_, d_output_, d_tmp1_, d_tmp2_, img_w_, img_h_, img_stride_,
                                                     op, d_se_i2_, n_offsets_, se_w_, se_h_, anchor_x_, anchor_y_,
                                                     stream_);
                 }
